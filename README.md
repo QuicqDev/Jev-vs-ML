@@ -4,6 +4,8 @@
 
 A comparison of **Jev 1.13.0 and 11 classical classification pipelines** across eight datasets, using three training seeds and a shared test set. The published run uses protocol **3.0.1 (V3)**.
 
+The [V4 continuity pilot](docs/v4.md) is now in development. The results below and the public report remain V3.
+
 Jev's strongest result is IMDb sentiment classification: **96.3% raw balanced accuracy**, compared with **88.4%** for the best classical pipeline in this run. Results elsewhere are mixed; classical pipelines lead on all four tabular datasets. This is a bounded-budget comparison.
 
 ## Start here
@@ -35,6 +37,7 @@ The saved run reports 38,922 request attempts. Its approximately $4.19 input-cos
 
 ```text
 jevbench/           Benchmark implementation used by V2 and V3
+jevbench_v4/        V4 adapters, continuity runner, and reference baselines
 notebooks/          Published V3 notebook and historical V1/V2 notebooks
 bundles/            Original downloadable source and notebook archives
 published_results/  Tables extracted from the completed run and provenance

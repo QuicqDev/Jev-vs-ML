@@ -11,3 +11,5 @@
 All three original notebooks are preserved byte for byte. Each is self-contained for Kaggle. Use V3 to inspect or reproduce the published comparison; earlier versions have different protocols.
 
 Build fresh notebooks into `generated/` using the [development commands](../docs/development.md). The [release bundles](../bundles/README.md) retain the original source downloads.
+
+The [V4 compatibility pilot](../docs/v4.md) is built separately with `python -m scripts.build_v4_notebook`. Its unexecuted notebook goes into `generated/`; there are no published V4 results yet.
