@@ -54,7 +54,7 @@ def full_table(panel):
         out.append(f'<tr><th scope="row">{html.escape(row["dataset"])}</th>')
         for model in models:
             score = row['scores'][model]
-            cls = ('jev-cell ' if model.startswith('Jev ') else '') + ('best' if score['mean'] == best else '')
+            cls = 'best' if score['mean'] == best else ''
             value = f'{score["mean"]:.1f} ± {score["sd"]:.1f}'
             if score['mean'] == best:
                 value = f'<strong>{value}</strong>'

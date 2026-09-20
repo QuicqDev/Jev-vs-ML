@@ -23,7 +23,7 @@
     const models = ['Jev zero-shot', 'Jev few-shot', ...data[panel].models.filter(m => !m.startsWith('Jev '))];
     table.innerHTML = `<caption class="sr-only">${title} balanced accuracy: mean ± sample standard deviation, three seeds.</caption><thead><tr><th scope="col">Dataset</th>${models.map(m=>`<th scope="col">${escape(m)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => {
       const best = Math.max(...Object.values(row.scores).map(s => s.mean));
-      return `<tr><th scope="row">${escape(row.dataset)}</th>${models.map(m => { const s = row.scores[m]; return `<td class="${m.startsWith('Jev ') ? 'jev-cell ' : ''}${s.mean === best ? 'best' : ''}" title="${escape(m)}: ${escape(s.display)}">${s.mean === best ? '<strong>' : ''}${s.mean.toFixed(1)} ± ${s.sd.toFixed(1)}${s.mean === best ? '</strong>' : ''}</td>`; }).join('')}</tr>`;
+      return `<tr><th scope="row">${escape(row.dataset)}</th>${models.map(m => { const s = row.scores[m]; return `<td class="${s.mean === best ? 'best' : ''}" title="${escape(m)}: ${escape(s.display)}">${s.mean === best ? '<strong>' : ''}${s.mean.toFixed(1)} ± ${s.sd.toFixed(1)}${s.mean === best ? '</strong>' : ''}</td>`; }).join('')}</tr>`;
     }).join('')}</tbody>`;
     document.getElementById('table-panel').textContent = `${title} · ${rows.length} datasets · 14 model columns`;
     const download = document.getElementById('csv-download');
