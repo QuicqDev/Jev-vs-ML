@@ -25,3 +25,11 @@ Small footer in readable type: "Jev 1.13.0 · V3 protocol · Means across 3 seed
 Second footer: "Bounded-budget ML comparison. Small tabular holdouts. Banking77 includes API-failure warnings."
 Bottom source: "github.com/QuicqDev/Jev-vs-ML"
 All exact data and signs must be legible and accurate. This is a designed research figure ready for a public release, not a screenshot of an interface.
+
+## Blue revision
+
+The final published graphic is `assets/benchmark-release-blue.png`. It was edited with the built-in image generation tool from the original graphic, with all eight rows and their values visually verified again. The original is retained as `assets/benchmark-release.png`.
+
+Final edit prompt:
+
+Edit this benchmark graphic into a modern Apple-inspired blue research release card. Preserve ALL wording, every numerical value, every sign, all eight table rows, the same four columns and column relationships EXACTLY. Change only visual presentation: crisp SF Pro / Helvetica-like sans-serif typography throughout (no serif), white and very pale icy blue background, near-black navy text, saturated cobalt #0071e3 for Jev swatch, subdued blue-gray for classical swatch, pale blue highlight on the IMDb row, softly rounded table container with fine gray-blue dividers, generous spacing, exceptionally clean premium minimal product-page design. Use a very subtle blue ambient glow only behind title area, not behind table. Keep all footnotes and github.com/QuicqDev/Jev-vs-ML fully readable. No logos, no affiliation, no devices, no extra claims. Final result must be a polished high-resolution landscape benchmark graphic, with identical factual content to the provided image.

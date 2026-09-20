@@ -1,6 +1,6 @@
 # Jev vs. classical machine learning
 
-**[Read the interactive benchmark report](https://quicqdev.github.io/Jev-vs-ML/)** · [Download the release graphic](docs/assets/benchmark-release.png)
+**[Read the interactive benchmark report](https://quicqdev.github.io/Jev-vs-ML/)** · [Download the release graphic](docs/assets/benchmark-release-blue.png)
 
 A completed comparison of **Jev 1.13.0 against 11 conventional classification pipelines** on eight datasets. The published run uses protocol **3.0.1 / V3**, three training seeds, and one fixed test set per dataset.
 
