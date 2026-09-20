@@ -9,7 +9,7 @@ from .storage import environment, freeze, read_json, write_json
 
 
 def run_provider(root, provider, dataset, seed, partition="train", limit=50,
-                 max_attempts=50000, max_seconds=7200, min_interval=.15):
+                 max_attempts=50000, max_seconds=7200, min_interval=.15, execution=None):
     if partition not in ("train", "policy", "test"):
         raise ValueError("partition must be train, policy or test")
     if limit is not None and limit < 1:
@@ -27,7 +27,8 @@ def run_provider(root, provider, dataset, seed, partition="train", limit=50,
     provider_root = root / "providers" / digest(provider.identity)
     job = provider_root / dataset.replace(" ", "_") / str(seed) / partition
     freeze(job / "job.json", {"run_id": run["run_id"], "provider": provider.identity,
-          "environment": environment(), "dataset": dataset, "seed": seed, "partition": partition,
+          "environment": environment(), "execution": execution,
+          "dataset": dataset, "seed": seed, "partition": partition,
           "case_ids": case_ids, "snapshot_sha256": metadata["sha256"], "limit": limit})
     client = DecisionClient(provider, provider_root, run["run_id"], max_attempts=max_attempts,
                             max_seconds=max_seconds, min_interval=min_interval)

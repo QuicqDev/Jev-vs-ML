@@ -4,11 +4,30 @@ import unittest
 from unittest.mock import Mock, patch
 
 from jevbench_v4.contracts import PermanentProviderError, RetryableProviderError
-from jevbench_v4.providers import JevProvider, LayaProvider, VonProvider, verify_source
+from jevbench_v4.providers import JevProvider, LayaProvider, VonProvider, audit_device, verify_source
 from tests.v4.helpers import body, request
 
 
 class ProviderTests(unittest.TestCase):
+    def test_gpu_fallback_and_misplaced_model_tensors_are_rejected(self):
+        model = SimpleNamespace(parameters=lambda: iter([SimpleNamespace(device="cuda:0")]),
+                                buffers=lambda: iter([SimpleNamespace(device="cuda:0")]))
+        self.assertEqual(audit_device("cuda:0", "cuda:0", model)["actual_device"], "cuda:0")
+        with self.assertRaises(PermanentProviderError):
+            audit_device("cuda:0", "cpu", model)
+        model.buffers = lambda: iter([SimpleNamespace(device="cpu")])
+        with self.assertRaises(PermanentProviderError):
+            audit_device("cuda:0", "cuda:0", model)
+
+    def test_laya_inference_cpu_fallback_cannot_produce_a_gpu_score(self):
+        provider = LayaProvider("cuda:0")
+        router = Mock()
+        router.predict.return_value = {**body(request()), "routing": {"model": "english"}}
+        router.load.return_value = SimpleNamespace(device="cpu")
+        provider.router = router
+        with self.assertRaisesRegex(PermanentProviderError, "fallback"):
+            provider.predict(request(), {"checkpoint": "english"})
+
     def test_jev_sends_full_state_and_77_choices(self):
         req = request(77)
         response = body(req)

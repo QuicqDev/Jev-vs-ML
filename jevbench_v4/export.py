@@ -70,7 +70,8 @@ def export_run(root):
     source_root = Path(__file__).resolve().parents[1]
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(root.rglob("*")):
-            if path.is_file() and path.suffix in (".json", ".jsonl", ".parquet", ".csv") and not path.name.startswith("."):
+            gpu_log = path.suffix == ".log" and path.relative_to(root).parts[0] == "execution"
+            if path.is_file() and (path.suffix in (".json", ".jsonl", ".parquet", ".csv") or gpu_log) and not path.name.startswith("."):
                 archive.write(path, path.relative_to(root))
         for directory in ("jevbench", "jevbench_v4"):
             for path in sorted((source_root / directory).glob("*.py")):

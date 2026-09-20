@@ -29,10 +29,11 @@ def merge_runs(destination, inputs):
         inventory = {}
         for path in sorted(root.rglob("*")):
             relative = path.relative_to(root)
-            if not path.is_file() or (relative.parts[0] not in ("data", "providers", "baselines")
+            if not path.is_file() or (relative.parts[0] not in ("data", "providers", "baselines", "execution")
                                      and relative.as_posix() != "run.json"):
                 continue
-            if path.suffix not in (".json", ".jsonl", ".parquet", ".csv") or path.name.startswith("."):
+            gpu_log = path.suffix == ".log" and relative.parts[0] == "execution"
+            if (path.suffix not in (".json", ".jsonl", ".parquet", ".csv") and not gpu_log) or path.name.startswith("."):
                 continue
             checksum = hashlib.sha256(path.read_bytes()).hexdigest()
             if relative.parts[0] == "data":

@@ -2,6 +2,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 from jevbench_v4.data import configuration, prepare
@@ -40,9 +41,15 @@ class WorkerTests(unittest.TestCase):
         jev, local = FakeProvider("fake-jev"), FakeProvider("fake-local")
         run_provider(self.root, jev, DATASET, 2027, limit=4, min_interval=0)
         run_provider(worker, local, DATASET, 2027, limit=4, min_interval=0)
+        execution = worker / "execution/local"
+        write_json(execution / "plan.json", {"test_gpu_assignment": [0, 1]})
+        (execution / "von.log").write_text("test worker log", encoding="utf-8")
         destination = self.root.with_name("combined")
         archive = merge_runs(destination, [self.root, worker])
         self.assertTrue(archive.is_file())
+        with zipfile.ZipFile(archive) as bundle:
+            self.assertIn("execution/local/plan.json", bundle.namelist())
+            self.assertEqual(bundle.read("execution/local/von.log"), b"test worker log")
         self.assertEqual(len(collect_summaries(destination)), 2)
         self.assertEqual((jev.calls, local.calls), (4, 4))
         with self.assertRaises(ValueError):
@@ -67,4 +74,3 @@ class WorkerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             merge_runs(destination, [self.root, worker])
         self.assertFalse(destination.exists())
-

@@ -15,6 +15,20 @@ LAYA_SOURCE = "42626c348753fbb17572a813127df2278a1ec527"
 LAYA_WEIGHTS = "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
 
 
+def audit_device(requested, actual, model=None):
+    """Reject SDK fallback or misplaced weights instead of recording CPU as a GPU run."""
+    requested = "cuda:0" if str(requested) == "cuda" else str(requested)
+    actual = "cuda:0" if str(actual) == "cuda" else str(actual)
+    if requested != actual:
+        raise PermanentProviderError(f"Requested {requested}, but the SDK uses {actual}; GPU fallback is not allowed")
+    if model is not None:
+        devices = {str(parameter.device) for parameter in model.parameters()}
+        devices.update(str(buffer.device) for buffer in model.buffers())
+        if devices != {actual}:
+            raise PermanentProviderError("Model tensors are not all on the requested device")
+    return {"actual_device": actual, "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES")}
+
+
 def verify_source(distribution, revision):
     metadata = importlib.metadata.distribution(distribution)
     direct = json.loads(metadata.read_text("direct_url.json") or "{}")
@@ -88,8 +102,9 @@ class VonProvider:
 
     def audit(self, request):
         backend = self._load()
-        _, tokenizer = backend._get_model_and_tok()
-        return {**audit_von(tokenizer, request), "actual_device": str(backend.device),
+        model, tokenizer = backend._get_model_and_tok()
+        device = audit_device(self.device, backend.device, model)
+        return {**audit_von(tokenizer, request), **device,
                 "checkpoint_revision": VON_WEIGHTS}
 
     def predict(self, request, audit):
@@ -127,9 +142,10 @@ class LayaProvider:
         from laya.common import build_sequence, render_options
         route = router.route(request.state, request.questions)
         agent = router.load(route["model"])
+        device = audit_device(self.device, agent.device, agent.model)
         result = audit_laya(agent.tok, request, agent.cfg, build_sequence, render_options)
         return {**result, "checkpoint": route["model"], "checkpoint_revision": LAYA_WEIGHTS,
-                "actual_device": str(agent.device), "routing_reason": route["reason"]}
+                **device, "routing_reason": route["reason"]}
 
     def predict(self, request, audit):
         result = self._load_router().predict(request.state, request.questions)
@@ -137,7 +153,8 @@ class LayaProvider:
             raise PermanentProviderError("Laya routing changed between audit and inference")
         result["routing"]["weights_revision"] = LAYA_WEIGHTS
         agent = self.router.load(audit["checkpoint"])
-        result["routing"]["actual_device"] = str(agent.device)
+        # The SDK can also fall back during inference, after the input audit.
+        result["routing"].update(audit_device(self.device, agent.device, getattr(agent, "model", None)))
         return result
 
 
