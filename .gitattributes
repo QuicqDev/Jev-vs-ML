@@ -1,0 +1,4 @@
+# Preserve byte-exact provenance between frozen notebook packages, source and bundles.
+# -text disables newline conversion; ordinary text diffs remain available.
+* -text whitespace=cr-at-eol
+*.zip binary

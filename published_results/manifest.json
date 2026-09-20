@@ -1,0 +1,21 @@
+{
+  "source_notebook": "jev_benchmark_v3.ipynb",
+  "sha256": "9835ceb7b1db2f0ffd1b93e713c998ccc7ad3a38feb5fa33488118fb4e197367",
+  "protocol": "3.0.1",
+  "requested_jev_model": "jev-1.13.0",
+  "training_seeds": [
+    2027,
+    2028,
+    2029
+  ],
+  "holdout_seed": 20260920,
+  "provenance": "Final saved notebook outputs; no cells rerun. CSV values retain displayed rounding.",
+  "uncertainty": "Mean and sample SD across training seeds on the same test cases; not confidence intervals.",
+  "unavailable": [
+    "per-example predictions",
+    "paired_bootstrap_intervals.csv",
+    "run_diagnostics.csv",
+    "dataset snapshots",
+    "full Kaggle result archive"
+  ]
+}

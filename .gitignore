@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+results/
+.venv/
+generated/
+.ipynb_checkpoints/
+*.py[cod]
+*.log
+*_results.zip
+.DS_Store
+Thumbs.db

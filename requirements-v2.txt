@@ -1,0 +1,12 @@
+numpy>=1.26,<3
+pandas>=2.2,<3
+scipy>=1.11,<2
+scikit-learn==1.8.0
+xgboost==2.1.4
+catboost==1.2.8
+pyarrow>=15
+huggingface-hub>=0.28,<2
+requests>=2.31
+joblib>=1.4
+threadpoolctl>=3.1
+tqdm>=4.66

@@ -1,0 +1,22 @@
+{
+  "model": "jev-latest",
+  "state": {
+    "session_duration_seconds": 420,
+    "pages_viewed": 8,
+    "cart_value": 3200,
+    "items_in_cart": 3,
+    "checkout_started": true,
+    "previous_purchases": 2
+  },
+  "questions": {
+    "purchase_intent": {
+      "type": "choice",
+      "instructions": "Predict the purchase intent of this visitor.",
+      "criteria": {
+        "LOW": "Unlikely to purchase",
+        "MEDIUM": "Some purchase intent",
+        "HIGH": "Strong likelihood of purchasing"
+      }
+    }
+  }
+}
