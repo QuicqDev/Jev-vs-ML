@@ -1,4 +1,4 @@
-"""Fresh continuity manifests with shared test cases and complete input text."""
+"""New V4 policy cases; the earlier continuity harness remains opt-in."""
 import hashlib
 import json
 from pathlib import Path
@@ -8,15 +8,28 @@ import pandas as pd
 from jevbench.datasets import make_holdout, make_split, prepare_data
 from .contracts import DecisionRequest, canonical, digest
 from .storage import freeze, read_json, source_fingerprint
+from .policy import DATASET as POLICY_DATASET, generate
 
-DATASETS = ("IMDb", "Banking77", "Bank Marketing")
+CONTINUITY_DATASETS = ("IMDb", "Banking77", "Bank Marketing")
+DATASETS = (POLICY_DATASET, *CONTINUITY_DATASETS)
 
 
-def configuration(preset="pilot"):
+def configuration(preset="pilot", suite="policy"):
+    if suite == "policy":
+        if preset not in ("pilot", "study"):
+            raise ValueError("The additional policy suite uses pilot or study presets")
+        counts = (40, 16, 16, 32) if preset == "pilot" else (600, 160, 160, 600)
+        return {"protocol": "4.0.0-dev2", "status": "synthetic-draft-needs-human-review",
+                "suite": suite, "preset": preset, "datasets": [POLICY_DATASET], "seeds": [2027],
+                "generator_seed": 20260921,
+                "pairs_per_partition": dict(zip(("train", "validation", "policy", "test"), counts))}
+    if suite != "continuity":
+        raise ValueError("suite must be policy or continuity")
     if preset not in ("pilot", "continuity"):
         raise ValueError("preset must be pilot or continuity")
-    return {"protocol": "4.0.0-dev1", "status": "compatibility-pilot", "preset": preset,
-            "datasets": list(DATASETS), "seeds": [2027] if preset == "pilot" else [2027, 2028, 2029],
+    return {"protocol": "4.0.0-dev2", "status": "optional-continuity", "preset": preset,
+            "suite": suite, "datasets": list(CONTINUITY_DATASETS),
+            "seeds": [2027] if preset == "pilot" else [2027, 2028, 2029],
             "holdout_seed": 20260921, "train_cap": 8000, "validation_cap": 1000,
             "policy_cap": 500, "test_cap": 1000, "banking_test_cap": 1500,
             "exclude_pilot_tests": False, "max_text_chars": None}
@@ -24,7 +37,7 @@ def configuration(preset="pilot"):
 
 def dataset_folder(root, dataset):
     if dataset not in DATASETS:
-        raise ValueError(f"Unknown V4 continuity dataset: {dataset}")
+        raise ValueError(f"Unknown V4 dataset: {dataset}")
     return Path(root) / "data" / dataset.replace(" ", "_")
 
 
@@ -41,21 +54,32 @@ def request_for(frame, row, metadata):
         tuple((f"C{i}", label) for i, label in enumerate(metadata["labels"])))
 
 
+def case_context(frame, row):
+    """Evaluation metadata, never included in a provider's model input."""
+    return {key: str(frame.iloc[row]["_" + key])
+            for key in ("pair_id", "family", "composition", "pair_relation") if "_" + key in frame}
+
+
 def freeze_splits(root, frame, metadata, config):
     dataset = metadata["name"]
     if dataset == "Bank Marketing" and "duration" in metadata["features"]:
         raise ValueError("Bank Marketing must exclude call duration")
     if any(column.startswith("_") or column == "label" for column in metadata["features"]):
         raise ValueError("Model features include label or split metadata")
-    holdout = make_holdout(frame, config)
+    is_policy = metadata.get("suite") == "policy"
+    holdout = None if is_policy else make_holdout(frame, config)
     ids = [digest({"dataset": dataset, "state": state_for(frame, i, metadata)}) for i in range(len(frame))]
     if len(set(ids)) != len(ids):
         raise ValueError("Duplicate model inputs remain in the snapshot")
     split_hashes = {}
     for seed in config["seeds"]:
-        split = make_split(frame, holdout, config, seed)
+        split = ({name: frame.index[frame["_partition"].eq(name)].tolist()
+                  for name in config["pairs_per_partition"]} if is_policy
+                 else make_split(frame, holdout, config, seed))
         manifest = {"dataset": dataset, "seed": seed, "snapshot_sha256": metadata["sha256"],
-                    "partitions": {}, "relationship_to_v3": "fresh-v4-holdout; not paired to published V3 means"}
+                    "partitions": {}, "relationship_to_v3":
+                    "additional-task; V3 remains historical context" if is_policy else
+                    "optional-continuity; not paired to published V3 means"}
         for partition, rows in split.items():
             selected = [int(i) for i in rows]
             manifest["partitions"][partition] = {"indices": selected, "case_ids": [ids[i] for i in selected],
@@ -77,9 +101,23 @@ def prepare(root, config=None):
     for dataset in config["datasets"]:
         if dataset not in DATASETS:
             raise ValueError(dataset)
-        # V3's raw loaders are reused with truncation disabled; never copy its
-        # already-truncated model-input snapshots into a V4 run directory.
-        frame, metadata = prepare_data(dataset, root, config)
+        if dataset == POLICY_DATASET:
+            frame, metadata = generate(config)
+            folder = dataset_folder(root, dataset)
+            folder.mkdir(parents=True, exist_ok=True)
+            snapshot = folder / "snapshot.parquet"
+            if snapshot.exists():
+                if not pd.read_parquet(snapshot).equals(frame):
+                    raise ValueError("Existing policy snapshot differs from the seeded generator")
+            else:
+                frame.to_parquet(snapshot, index=False)
+            metadata["sha256"] = hashlib.sha256(snapshot.read_bytes()).hexdigest()
+            freeze(folder / "metadata.json", metadata)
+            frame.groupby(["_partition", "_family", "_composition"], sort=True).head(2).to_csv(
+                folder / "review_sample.csv", index=False)
+        else:
+            # Retain V3's loaders for explicitly requested continuity diagnostics.
+            frame, metadata = prepare_data(dataset, root, config)
         freeze_splits(root, frame, metadata, config)
         print(f"Prepared {dataset}: {len(frame):,} complete, deduplicated inputs", flush=True)
     return read_json(root / "run.json")
@@ -104,6 +142,7 @@ def load_job(root, dataset, seed):
         raise ValueError("Dataset snapshot changed")
     frame = pd.read_parquet(folder / "snapshot.parquet")
     seen = set()
+    pair_partitions = {}
     for name, partition in split["partitions"].items():
         rows = partition["indices"]
         if len(rows) != len(set(rows)) or seen.intersection(rows):
@@ -112,6 +151,13 @@ def load_job(root, dataset, seed):
         expected = [digest({"dataset": dataset, "state": state_for(frame, i, metadata)}) for i in rows]
         if expected != partition["case_ids"]:
             raise ValueError("Split case identities changed")
+        if "_pair_id" in frame:
+            if not frame.iloc[rows]["_partition"].eq(name).all():
+                raise ValueError("Generated partition boundary crossed")
+            for pair_id, group in frame.iloc[rows].groupby("_pair_id"):
+                if len(group) != 2 or pair_id in pair_partitions:
+                    raise ValueError("Incomplete pair or a pair crossing partitions")
+                pair_partitions[pair_id] = name
         if "_official_split" in frame:
             required = "test" if name == "test" else "train"
             if not frame.iloc[rows]["_official_split"].eq(required).all():

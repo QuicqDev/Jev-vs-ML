@@ -4,6 +4,18 @@ from jevbench_v4.metrics import summarize
 
 
 class MetricTests(unittest.TestCase):
+    def test_pair_success_counts_failed_members_and_rejects_partial_pairs(self):
+        context = dict(family="negation", composition="familiar", pair_relation="flip")
+        rows = [dict(pair_id=pair, label=label, prediction=label, status="ok", **context)
+                for pair in ("a", "b") for label in (0, 1)]
+        rows[-1].update(prediction=-1, status="unsupported")
+        result = summarize(rows, 2)
+        self.assertEqual(result["accuracy"], .75)
+        self.assertEqual(result["n_pairs"], 2)
+        self.assertEqual(result["both_members_correct"], .5)
+        with self.assertRaises(ValueError):
+            summarize(rows[:-1], 2)
+
     def test_failures_remain_in_accuracy_and_probability_coverage_is_explicit(self):
         rows = [dict(label=0, prediction=0, status="ok", probabilities=[1, 0], latency_ms=10),
                 dict(label=1, prediction=-1, status="failed", probabilities=None, latency_ms=30),

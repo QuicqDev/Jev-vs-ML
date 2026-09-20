@@ -1,4 +1,4 @@
-"""Small predeclared continuity baselines, selected only on development data."""
+"""Small optional comparators fitted only for the selected task."""
 import time
 from pathlib import Path
 
@@ -15,7 +15,7 @@ from sklearn.svm import LinearSVC, SVC
 from threadpoolctl import threadpool_limits
 
 from .contracts import canonical, digest
-from .data import load_job
+from .data import case_context, load_job
 from .metrics import summarize
 from .storage import environment, freeze, write_json
 
@@ -53,6 +53,8 @@ def candidates(kind, name, frame, seed, threads):
 def run_baseline(root, dataset, seed, name="svm", threads=2):
     frame, metadata, split = load_job(root, dataset, seed)
     x = frame["text"] if metadata["kind"] == "text" else frame[metadata["features"]].copy()
+    if metadata.get("suite") == "policy":
+        x = metadata["task"] + "\n" + x
     if name == "catboost":
         for col in x.select_dtypes(exclude=[np.number]):
             x[col] = x[col].fillna("__MISSING__").astype(str)
@@ -83,9 +85,11 @@ def run_baseline(root, dataset, seed, name="svm", threads=2):
         probabilities = model.predict_proba(x.iloc[test]) if hasattr(model, "predict_proba") else None
     records = [{"case_id": case, "label": int(y[row]), "prediction": int(pred), "status": "ok",
                 "probabilities": probabilities[i].tolist() if probabilities is not None else None,
-                "cache_hit": False, "latency_ms": None}
+                "cache_hit": False, "latency_ms": None, **case_context(frame, row)}
                for i, (case, row, pred) in enumerate(zip(split["partitions"]["test"]["case_ids"], test, prediction))]
     summary = {"dataset": dataset, "seed": seed, "partition": "test", "baseline": name, "panel": "raw",
+               "suite": run["config"].get("suite", "continuity"), "status": "draft-evaluation",
+               "label_status": metadata.get("label_status", "public-dataset"),
                "fit_seconds": fit_seconds, "selected": scores[best], "training_labels": len(train),
                "selection_labels": len(selection), "policy_labels_used": 0,
                "probability_kind": "native" if probabilities is not None else "unavailable-svm-margins",

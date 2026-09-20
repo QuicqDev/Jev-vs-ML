@@ -1,5 +1,6 @@
 """Operational metrics keep failures and unsupported inputs in the denominator."""
 import numpy as np
+from collections import defaultdict
 from sklearn.metrics import f1_score, log_loss
 
 
@@ -35,4 +36,29 @@ def summarize(records, n_classes):
             raise ValueError("Invalid probability distribution")
         result["brier"] = float(np.mean(np.sum((probabilities - np.eye(n_classes)[labels]) ** 2, axis=1)))
         result["log_loss"] = float(log_loss(labels, probabilities, labels=list(range(n_classes))))
+    if any("pair_id" in record for record in records):
+        result.update(summarize_pairs(records))
     return result
+
+
+def summarize_pairs(records):
+    pairs = defaultdict(list)
+    for record in records:
+        pairs[record["pair_id"]].append(record)
+    if any(len(pair) != 2 for pair in pairs.values()):
+        raise ValueError("Pair metrics require exactly two observations per base scenario")
+    breakdown = defaultdict(list)
+    correct = []
+    for pair in pairs.values():
+        context = [(r["family"], r["composition"], r["pair_relation"]) for r in pair]
+        if context[0] != context[1]:
+            raise ValueError("Pair metadata differs between members")
+        relation = "preserve" if pair[0]["label"] == pair[1]["label"] else "flip"
+        if relation != pair[0]["pair_relation"]:
+            raise ValueError("Declared pair relation differs from the labels")
+        success = all(r["status"] == "ok" and r["prediction"] == r["label"] for r in pair)
+        correct.append(success)
+        breakdown[" / ".join(context[0][:2])].append(success)
+    return {"n_pairs": len(pairs), "both_members_correct": float(np.mean(correct)),
+            "pair_breakdown": {key: {"n_pairs": len(values), "both_members_correct": float(np.mean(values))}
+                               for key, values in sorted(breakdown.items())}}

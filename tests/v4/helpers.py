@@ -35,7 +35,7 @@ class FakeProvider:
 
 def prepared_fixture(root, dataset="IMDb", seeds=(2027, 2028)):
     root = Path(root)
-    config = configuration()
+    config = configuration(suite="continuity")
     config.update(datasets=[dataset], seeds=list(seeds), train_cap=80, validation_cap=30,
                   policy_cap=30, test_cap=40, banking_test_cap=40)
     if dataset == "IMDb":

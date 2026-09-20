@@ -1,9 +1,9 @@
-"""Resumable continuity evaluations and a development-only compatibility pilot."""
+"""Resumable additional evaluations and development-only compatibility pilots."""
 from pathlib import Path
 
 from .client import DecisionClient
 from .contracts import canonical, digest
-from .data import load_job, request_for
+from .data import case_context, load_job, request_for
 from .metrics import summarize
 from .storage import environment, freeze, read_json, write_json
 
@@ -21,6 +21,8 @@ def run_provider(root, provider, dataset, seed, partition="train", limit=50,
     frame, metadata, split = load_job(root, dataset, seed)
     selected = split["partitions"][partition]
     rows = selected["indices"][:limit] if limit else selected["indices"]
+    if "_pair_id" in frame and len(rows) % 2:
+        raise ValueError("A paired policy pilot must include complete pairs (an even limit)")
     case_ids = selected["case_ids"][:len(rows)]
     provider_root = root / "providers" / digest(provider.identity)
     job = provider_root / dataset.replace(" ", "_") / str(seed) / partition
@@ -41,14 +43,16 @@ def run_provider(root, provider, dataset, seed, partition="train", limit=50,
         else:
             result = client.call(request, context={"dataset": dataset, "seed": seed, "partition": partition})
             record = {**result, "case_id": case_id, "input_hash": request_hash,
-                      "label": int(frame.iloc[row].label)}
+                      "label": int(frame.iloc[row].label), **case_context(frame, row)}
             write_json(path, record)
         records.append(record)
     summary = {"dataset": dataset, "seed": seed, "partition": partition, "provider": provider.identity,
-               "panel": "raw", "status": "development-pilot" if partition == "train" else "continuity-evaluation",
+               "panel": "raw", "suite": run["config"].get("suite", "continuity"),
+               "label_status": metadata.get("label_status", "public-dataset"),
+               "status": "development-pilot" if partition == "train" else "draft-evaluation",
                **summarize(records, len(metadata["labels"]))}
-    write_json(job / "summary.json", summary)
     # Portable per-case export with exact order/IDs for later paired comparisons.
     (job / "predictions.jsonl").write_text("".join(canonical(r) + "\n" for r in records), encoding="utf-8")
+    write_json(job / "summary.json", summary)
     print(f"{provider.identity['name']} / {dataset} / {partition}: {summary['statuses']}", flush=True)
     return summary
