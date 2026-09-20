@@ -1,9 +1,19 @@
 """Generate the portable Kaggle notebook without requiring nbformat locally."""
 import hashlib
 import json
+import argparse
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--output-dir', default='generated', help='Destination for a fresh V1 notebook.')
+args = parser.parse_args()
+path = (ROOT / args.output_dir).resolve() / 'jev_classification_benchmark.ipynb'
+if path.exists():
+    existing = json.loads(path.read_text(encoding='utf-8'))
+    if any(cell.get('outputs') for cell in existing['cells']):
+        raise SystemExit('Refusing to overwrite an executed notebook. Choose another --output-dir.')
+path.parent.mkdir(parents=True, exist_ok=True)
 cells = []
 
 
@@ -65,7 +75,7 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
     "numpy>=1.26,<3", "requests>=2.31", "matplotlib>=3.7", "threadpoolctl>=3", "tqdm>=4.66"])
 ''')
 
-source = (ROOT / 'kaggle_benchmark.py').read_text(encoding='utf-8')
+source = (ROOT / 'legacy' / 'kaggle_benchmark.py').read_text(encoding='utf-8')
 sections = source.split('# %%\n')
 headings = ['## 2 · Data loading and reproducible splits', '## 3 · ML pipelines and modest validation search',
             '## 4 · Jev API, bounded concurrency and checkpointing', '## 5 · Orchestration and reporting']
@@ -176,6 +186,5 @@ notebook = dict(cells=cells, metadata=dict(kernelspec=dict(display_name='Python 
                benchmark_source_sha256=hashlib.sha256(source.encode()).hexdigest()), nbformat=4, nbformat_minor=5)
 for i, cell in enumerate(cells):
     cell['id'] = f'benchmark-{i:03d}'
-path = ROOT / 'jev_classification_benchmark.ipynb'
 path.write_text(json.dumps(notebook, indent=1), encoding='utf-8')
 print(path)

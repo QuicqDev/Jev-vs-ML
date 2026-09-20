@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix, roc_auc_score
-import kaggle_benchmark as b
+from legacy import kaggle_benchmark as b
 
-root = Path(__file__).resolve().parent / 'results' / 'notebook_data_validation' / 'data'
+root = Path(__file__).resolve().parents[1] / 'results' / 'notebook_data_validation' / 'data'
 cfg = b.config('benchmark')
 results = []
 with b.threadpool_limits(limits=2):

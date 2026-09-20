@@ -7,11 +7,11 @@ import uuid
 
 
 def main():
-    root_dir = Path(__file__).resolve().parent
+    root_dir = Path(__file__).resolve().parents[1]
     # Notebook functions are not importable from a Python module. Exercise that
     # cloudpickle path explicitly rather than only testing module-level functions.
     namespace = {'__name__': 'notebook_validation_session'}
-    source = (root_dir / 'kaggle_benchmark.py').read_text(encoding='utf-8')
+    source = (root_dir / 'legacy' / 'kaggle_benchmark.py').read_text(encoding='utf-8')
     exec(compile(source, '<notebook-definitions>', 'exec'), namespace)
     b = SimpleNamespace(**namespace)
     cfg = b.config('quick')

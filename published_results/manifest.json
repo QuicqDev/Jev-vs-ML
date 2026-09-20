@@ -1,5 +1,7 @@
 {
-  "source_notebook": "jev_benchmark_v3.ipynb",
+  "source_notebook": "notebooks/jev_benchmark_v3.ipynb",
+  "source_bundle": "bundles/jev_benchmark_v3_bundle.zip",
+  "bundle_sha256": "d5143839938f6e6bfb02aecba61e9630125e4ab4890ec0bfc0641288421b4ae3",
   "sha256": "9835ceb7b1db2f0ffd1b93e713c998ccc7ad3a38feb5fa33488118fb4e197367",
   "protocol": "3.0.1",
   "requested_jev_model": "jev-1.13.0",

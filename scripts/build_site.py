@@ -7,7 +7,7 @@ import re
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / 'docs'
 TEST_ROWS = [1000, 1500, 1000, 1000, 1000, 1000, 114, 30]
 

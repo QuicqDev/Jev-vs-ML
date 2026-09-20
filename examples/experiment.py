@@ -8,7 +8,7 @@ from pathlib import Path
 import statistics
 import time
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def api_key():

@@ -2,7 +2,7 @@
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import kaggle_benchmark as b
+from legacy import kaggle_benchmark as b
 
 
 def check(y, cap, seed=42):
@@ -37,7 +37,7 @@ else:
     raise AssertionError('Too-small cap should fail')
 print('Original failure reproduced; proportional capping edge cases: PASS')
 
-root = Path(__file__).resolve().parent / 'results' / 'notebook_data_validation' / 'data'
+root = Path(__file__).resolve().parents[1] / 'results' / 'notebook_data_validation' / 'data'
 for preset in ['quick', 'benchmark']:
     cfg = b.config(preset)
     for name in cfg['datasets']:

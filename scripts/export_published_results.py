@@ -5,7 +5,7 @@ import json
 from html.parser import HTMLParser
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 class TableParser(HTMLParser):
     def __init__(self):
@@ -38,7 +38,7 @@ def saved_tables(notebook):
         yield panel, [header] + rows
 
 def export():
-    path = ROOT / 'jev_benchmark_v3.ipynb'
+    path = ROOT / 'notebooks' / 'jev_benchmark_v3.ipynb'
     notebook = json.loads(path.read_text(encoding='utf-8'))
     out = ROOT / 'published_results'
     out.mkdir(exist_ok=True)
@@ -46,7 +46,9 @@ def export():
         with (out / f'{panel}_balanced_accuracy.csv').open('w', newline='', encoding='utf-8') as f:
             csv.writer(f).writerows(rows)
     manifest = {
-        'source_notebook': path.name,
+        'source_notebook': path.relative_to(ROOT).as_posix(),
+        'source_bundle': 'bundles/jev_benchmark_v3_bundle.zip',
+        'bundle_sha256': hashlib.sha256((ROOT / 'bundles/jev_benchmark_v3_bundle.zip').read_bytes()).hexdigest(),
         'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
         'protocol': '3.0.1', 'requested_jev_model': 'jev-1.13.0',
         'training_seeds': [2027, 2028, 2029], 'holdout_seed': 20260920,

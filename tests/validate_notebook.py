@@ -6,10 +6,10 @@ import uuid
 import nbformat
 import numpy as np
 import pandas as pd
-import kaggle_benchmark as b
+from legacy import kaggle_benchmark as b
 
-ROOT = Path(__file__).resolve().parent
-nb = nbformat.read(ROOT / 'jev_classification_benchmark.ipynb', as_version=4)
+ROOT = Path(__file__).resolve().parents[1]
+nb = nbformat.read(ROOT / 'notebooks' / 'jev_classification_benchmark.ipynb', as_version=4)
 nbformat.validate(nb)
 for i, cell in enumerate(nb.cells):
     if cell.cell_type == 'code':

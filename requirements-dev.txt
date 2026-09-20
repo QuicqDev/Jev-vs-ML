@@ -1,2 +1,2 @@
--r requirements-v2.txt
+-r requirements.txt
 nbformat>=5.10,<6

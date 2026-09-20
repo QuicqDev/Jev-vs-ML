@@ -8,13 +8,13 @@ A completed comparison of **Jev 1.13.0 against 11 conventional classification pi
 
 ## Results and artifacts
 
-- [Completed notebook with saved outputs](jev_benchmark_v3.ipynb)
+- [Completed notebook with saved outputs](notebooks/jev_benchmark_v3.ipynb)
 - [Raw balanced-accuracy table](published_results/raw_balanced_accuracy.csv)
 - [Threshold-adjusted balanced-accuracy table](published_results/adjusted_balanced_accuracy.csv)
 - [Artifact provenance and SHA-256](published_results/manifest.json)
-- [V3 source and notebook bundle](jev_benchmark_v3_bundle.zip)
-- [V3 protocol and backend choices](BENCHMARK_V3.md), with the [common V2 protocol](BENCHMARK_V2.md)
-- [Validation record](VALIDATION_V3.md)
+- [V3 source and notebook bundle](bundles/jev_benchmark_v3_bundle.zip)
+- [V3 protocol and backend choices](docs/protocols/BENCHMARK_V3.md), with the [common V2 protocol](docs/protocols/BENCHMARK_V2.md)
+- [Validation record](docs/validation/VALIDATION_V3.md)
 
 ### Threshold-adjusted balanced accuracy (%)
 
@@ -57,7 +57,7 @@ Without policy threshold adjustment, Jev zero-shot scores **96.3% on IMDb**, ver
 
 ## Reproduce on Kaggle
 
-1. Upload `jev_benchmark_v3.ipynb` to a fresh Kaggle session. Enable Internet and two T4 GPUs; use the latest GPU environment.
+1. Upload `notebooks/jev_benchmark_v3.ipynb` to a fresh Kaggle session. Enable Internet and two T4 GPUs; use the latest GPU environment.
 2. Add and enable the Kaggle secret `TYPESAFE_API_KEY`.
 3. Choose a new output `ROOT` if changing the configuration. The notebook already contains the exact source used for the published run.
 4. Run extraction, setup, preparation, and classical ML cells first. Run the separate Jev cell when ready to make paid API calls.
@@ -71,14 +71,14 @@ Python 3.12 is the version recorded by the completed notebook. A GPU is not requ
 
 ```bash
 python -m pip install -r requirements-dev.txt
-python validate_v3_artifact.py
-python validate_v3_backends.py
-python validate_gpu_process.py
+python -m tests.validate_v3_artifact
+python -m tests.validate_v3_backends
+python -m tests.validate_gpu_process
 ```
 
 The backend checks use doubles and the process checks do not perform CUDA computation. They do not substitute for the notebook's actual Kaggle GPU probes.
 
-To regenerate the CSVs from the saved outputs, run `python export_published_results.py`. To build a fresh unexecuted notebook from editable source, run `python build_modular_notebook.py --v3`. Generated notebooks and bundles go into the ignored `generated/` directory; the builder refuses to overwrite a notebook containing outputs.
+To regenerate the CSVs from the saved outputs, run `python -m scripts.export_published_results`. To build a fresh unexecuted notebook from editable source, run `python -m scripts.build_modular_notebook --v3`. Generated notebooks and bundles go into the ignored `generated/` directory; the builder refuses to overwrite a notebook containing outputs.
 
 `.env`, virtual environments, raw local results, request caches under `results/`, and generated result archives are excluded from Git. Do not put credentials in notebook cells.
 
@@ -86,10 +86,10 @@ To regenerate the CSVs from the saved outputs, run `python export_published_resu
 
 The GitHub Pages report is served from `main` / `docs`. It includes raw and adjusted comparisons, text/tabular filters, the full score table, methodology, limitations, and downloadable results. No external JavaScript libraries, analytics, or API keys are required.
 
-Edit `docs/report.template.html` and `docs/assets/report.css` for the presentation. Run `python build_site.py` to regenerate `docs/index.html`, chart data, and downloadable CSVs from `published_results/`. The published HTML includes the raw table and chart even without JavaScript. Interactive controls are in `docs/assets/report.js`.
+Edit `docs/report.template.html` and `docs/assets/report.css` for the presentation. Run `python -m scripts.build_site` to regenerate `docs/index.html`, chart data, and downloadable CSVs from `published_results/`. The published HTML includes the raw table and chart even without JavaScript. Interactive controls are in `docs/assets/report.js`.
 
 The release graphic was made with the built-in image generation tool; the exact prompt and verification notes are in [image provenance](docs/image-generation.md). Its numbers were checked against the raw result panel. The website's bar charts are rendered directly from CSV values.
 
 ## Earlier experiments
 
-[V1 notebook](jev_classification_benchmark.ipynb), [V1 Kaggle notes](KAGGLE_README.md), [V2 notebook](jev_benchmark_v2.ipynb), and [audit notes](BENCHMARK_AUDIT.md) are retained as historical artifacts. Their protocols and results should not be mixed with the published V3 tables. `experiment.py` and `examples/purchase_intent.json` are an earlier API smoke-test runner and synthetic example; running them makes paid requests.
+[V1 notebook](notebooks/jev_classification_benchmark.ipynb), [V1 Kaggle notes](docs/history/KAGGLE_README.md), [V2 notebook](notebooks/jev_benchmark_v2.ipynb), and [audit notes](docs/history/BENCHMARK_AUDIT.md) are retained as historical artifacts. Their protocols and results should not be mixed with the published V3 tables. `examples/experiment.py` and `examples/purchase_intent.json` are an earlier API smoke-test runner and synthetic example; running them makes paid requests.

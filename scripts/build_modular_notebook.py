@@ -6,6 +6,7 @@ import io
 import zipfile
 import nbformat as nbf
 import argparse
+from scripts.paths import FROZEN_INPUTS, ROOT
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--v3', action='store_true')
@@ -15,7 +16,6 @@ args = parser.parse_args()
 notebook_name = 'jev_benchmark_v3.ipynb' if args.v3 else 'jev_benchmark_v2.ipynb'
 bundle_name = 'jev_benchmark_v3_bundle.zip' if args.v3 else 'jev_benchmark_v2_bundle.zip'
 
-ROOT = Path(__file__).resolve().parent
 OUTPUT = (ROOT / args.output_dir).resolve()
 OUTPUT.mkdir(parents=True, exist_ok=True)
 destination = OUTPUT / notebook_name
@@ -27,8 +27,8 @@ buffer = io.BytesIO()
 with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
     for path in sorted((ROOT / 'jevbench').glob('*.py')):
         archive.writestr('jevbench/' + path.name, path.read_bytes())
-    for name in ['requirements-v2.txt', 'BENCHMARK_V2.md', 'BENCHMARK_V3.md']:
-        archive.writestr(name, (ROOT / name).read_bytes())
+    for name, path in FROZEN_INPUTS.items():
+        archive.writestr(name, path.read_bytes())
 blob = buffer.getvalue()
 encoded, checksum = base64.b64encode(blob).decode(), hashlib.sha256(blob).hexdigest()
 cells = []
@@ -157,9 +157,33 @@ nbf.write(nb, destination)
 with zipfile.ZipFile(OUTPUT / bundle_name, 'w', zipfile.ZIP_DEFLATED) as archive:
     for path in sorted((ROOT / 'jevbench').glob('*.py')):
         archive.write(path, 'jevbench/' + path.name)
-    for name in [notebook_name, 'requirements-v2.txt', 'BENCHMARK_V2.md', 'BENCHMARK_V3.md',
-                 'build_modular_notebook.py', 'validate_v2.py', 'validate_tabular_v2.py', 'VALIDATION_V2.md',
-                 'validate_v3_backends.py', 'profile_v3_histogram.py', 'VALIDATION_V3.md', 'validate_gpu_process.py']:
-        archive.write(destination if name == notebook_name else ROOT / name, name)
+    archive.write(destination, 'notebooks/' + notebook_name)
+    for name in ['requirements.txt', 'requirements-dev.txt',
+                 'docs/protocols/BENCHMARK_V2.md', 'docs/protocols/BENCHMARK_V3.md',
+                 'scripts/__init__.py', 'scripts/paths.py', 'scripts/build_modular_notebook.py',
+                 'scripts/profile_v3_histogram.py', 'tests/__init__.py',
+                 'tests/validate_v2.py', 'tests/validate_tabular_v2.py',
+                 'tests/validate_v3_backends.py', 'tests/validate_gpu_process.py',
+                 'docs/validation/VALIDATION_V2.md', 'docs/validation/VALIDATION_V3.md']:
+        archive.write(ROOT / name, name)
+    archive.writestr('README.md', '''# Fresh benchmark source bundle
+
+Upload the notebook in `notebooks/` to Kaggle. It contains its own source package.
+This is an unexecuted build; published results remain in the repository release.
+
+To edit and rebuild, run these commands from the extracted bundle directory:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m scripts.build_modular_notebook --v3
+python -m tests.validate_v3_backends
+python -m tests.validate_gpu_process
+```
+
+Omit `--v3` to build the V2 preset. Fresh output goes into `generated/`.
+Protocol files live in `docs/protocols/`; historical validation records live in
+`docs/validation/`. Integration and diagnostic scripts may need dataset snapshots
+under `results/notebook_data_validation/`. The Jev notebook cell makes paid API calls.
+''')
 print(destination)
 print('Embedded package SHA256:', checksum)

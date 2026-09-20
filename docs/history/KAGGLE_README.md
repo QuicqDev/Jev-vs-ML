@@ -1,4 +1,6 @@
-# Run the Jev classification benchmark on Kaggle
+# V1 Kaggle guide (historical)
+
+The published comparison is [V3](../../notebooks/jev_benchmark_v3.ipynb). This guide records the original pilot; its results and protocol belong to that earlier experiment.
 
 Upload **jev_classification_benchmark.ipynb** to a new Kaggle notebook. It is fully self-contained; no other project files or local `.env` are needed.
 
@@ -43,7 +45,7 @@ The notebook documents all feature representations, dropped fields and training 
 
 The notebook was validated locally for schema and code compilation, all eight public dataset loaders/splits, all 11 models on tiny text and tabular inputs, and mocked Jev response/caching/report integration. The parallel revision additionally passed real two-process execution with notebook-defined functions, explicit GPU-ID routing checks, and checkpoint reuse. Actual dual-GPU execution has not been tested locally; it is probed when the notebook starts on Kaggle. It has not been executed on Kaggle or through a full paid Jev benchmark. No scores in the notebook are fabricated or pre-filled.
 
-Developer files: `kaggle_benchmark.py` contains the implementation, `build_notebook.py` embeds it into the standalone notebook, `validate_notebook.py` runs offline integration checks, and `validate_parallel.py` exercises the process scheduler. Only the `.ipynb` is needed on Kaggle.
+Developer files: `legacy/kaggle_benchmark.py` contains the implementation, `scripts/build_notebook.py` embeds it into the standalone notebook, `tests/validate_notebook.py` runs offline integration checks, and `tests/validate_parallel.py` exercises the process scheduler. Only the `.ipynb` is needed on Kaggle.
 # Current version
 
-Use [jev_benchmark_v3.ipynb](jev_benchmark_v3.ipynb) and [BENCHMARK_V3.md](BENCHMARK_V3.md) for the faster cuML-enabled comparison. The instructions below describe the original pilot notebook.
+Use [jev_benchmark_v3.ipynb](../../notebooks/jev_benchmark_v3.ipynb) and [BENCHMARK_V3.md](../protocols/BENCHMARK_V3.md) for the faster cuML-enabled comparison. The instructions above describe the original pilot notebook.
