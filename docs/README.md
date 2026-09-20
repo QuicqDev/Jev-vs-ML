@@ -6,7 +6,7 @@
 |---|---|
 | [Results and interpretation](results.md) | Scores, experiment scope, and limitations |
 | [Development guide](development.md) | Setup, commands, source map, and report maintenance |
-| [V4 pilot guide](v4.md) | New continuity harness, offline tests, and Kaggle workflow |
+| [V4 additions guide](v4.md) | New policy test scaffold, offline tests, and two parallel Kaggle notebooks |
 | [V4 proposed study](protocols/BENCHMARK_V4_PLAN.md) | Follow-up experiment design; not yet a frozen protocol |
 | [V3 protocol](protocols/BENCHMARK_V3.md) | Published run budgets, representations, and backend choices |
 | [Common V2 protocol](protocols/BENCHMARK_V2.md) | Shared methodology, with V3 overrides documented separately |

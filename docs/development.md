@@ -6,7 +6,7 @@ Run commands from the repository root. Python 3.12 is the version recorded in th
 
 ## Common tasks
 
-For the new benchmark, see the [V4 pilot guide](v4.md). Run `python -m tests.validate_v4` for its offline suite and `python -m scripts.build_v4_notebook` to build the Kaggle pilot. V4 lives in `jevbench_v4/` so the frozen V3 source can still be validated.
+For additional tests responding to Reddit feedback, see the [V4 guide](v4.md). Run `python -m tests.validate_v4` for its offline suite and `python -m scripts.build_v4_notebook` to build separate Jev and local-model notebooks with identical prepared inputs. V4 lives in `jevbench_v4/` so the frozen V3 source can still be validated; it does not repeat the completed benchmark.
 
 | Task | Command |
 |---|---|
