@@ -39,6 +39,9 @@ class NotebookTests(unittest.TestCase):
             self.assertNotIn("'--provider', 'jev'", local_commands)
             self.assertNotIn("command('baselines')", jev_commands)
             self.assertNotIn("command('prepare'", jev_commands + local_commands)
+            self.assertIn("command('local', '--phase', 'pilot', '--gpus', '0', '1', '--min-gpus', '2')", local_commands)
+            self.assertIn("command('local', '--phase', 'evaluate', '--gpus', '0', '1', '--min-gpus', '2')", local_commands)
+            self.assertNotIn("command('local'", jev_commands)
             with zipfile.ZipFile(io.BytesIO(base64.b64decode(encoded))) as bundle:
                 self.assertIn("jevbench_v4/providers.py", bundle.namelist())
                 self.assertIn("tests/validate_v4.py", bundle.namelist())

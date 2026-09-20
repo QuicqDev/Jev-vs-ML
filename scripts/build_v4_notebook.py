@@ -52,6 +52,7 @@ subprocess.check_call([sys.executable, '-m', 'tests.validate_v4'], cwd=CODE_DIR)
 '''), markdown("## Load the common frozen study\n\nNo old dataset download or independent split generation. Both workers copy the same byte-for-byte study package and verify it before inference."),
         code('''import shutil
 from jevbench_v4.storage import read_json
+from jevbench_v4.parallel import run_notebook_command
 
 ROOT = Path('/kaggle/working') / ('jev_benchmark_v4_' + WORKER_ROLE)
 if not ROOT.exists():
@@ -60,8 +61,8 @@ if read_json(ROOT / 'run.json') != read_json(CODE_DIR / 'study/run.json'):
     raise ValueError('Different study already exists here; choose a fresh ROOT.')
 
 def command(action, *options):
-    subprocess.check_call([sys.executable, '-m', 'scripts.run_v4', action,
-                           '--root', str(ROOT), *options], cwd=CODE_DIR)
+    run_notebook_command([sys.executable, '-m', 'scripts.run_v4', action,
+                          '--root', str(ROOT), *options], cwd=CODE_DIR)
 
 command('verify')
 print('Shared run ID:', read_json(ROOT / 'run.json')['run_id'])
@@ -78,22 +79,20 @@ if RUN_JEV and RUN_EVALUATION:
     command('evaluate', '--provider', 'jev', '--max-attempts', '10000', '--max-seconds', '7200')
 ''')]
     else:
-        cells += [markdown("## Local development compatibility\n\nInstall the pinned SDKs before starting model work. Von and Laya run in separate processes on one GPU at a time; the Jev notebook can run in parallel."),
+        cells += [markdown("## Local development compatibility — two T4 GPUs\n\nSelect Kaggle's two-T4 accelerator. The launcher requires two visible GPUs, runs Von on the first and Laya on the second simultaneously, and limits each process to its assigned GPU. Each worker performs an FP16 CUDA smoke test and rejects SDK CPU fallback. The Jev notebook runs independently."),
             code('''RUN_LOCAL_MODELS = False
 if RUN_LOCAL_MODELS:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '-r', str(CODE_DIR / 'requirements-v4-local.txt')])
-    for provider in ('von', 'laya'):
-        command('pilot', '--provider', provider, '--device', 'cuda:0')
+    command('local', '--phase', 'pilot', '--gpus', '0', '1', '--min-gpus', '2')
 '''), markdown("## Comparators on the new task only\n\nMajority and TF-IDF SVM use the new task's development labels. This does not repeat V3. Embeddings and temporal AutoML remain planned and must be added before claiming those Reddit questions are answered."),
             code('''RUN_EVALUATION = False
 RUN_NEW_TASK_BASELINES = False
 if RUN_LOCAL_MODELS and RUN_EVALUATION:
-    for provider in ('von', 'laya'):
-        command('evaluate', '--provider', provider, '--device', 'cuda:0')
+    command('local', '--phase', 'evaluate', '--gpus', '0', '1', '--min-gpus', '2')
 if RUN_NEW_TASK_BASELINES and RUN_EVALUATION:
     command('baselines')
 ''')]
-    cells += [markdown("## Export this worker\n\nSave both worker ZIPs. Extract them into separate directories, then merge with `python -m scripts.run_v4 merge --root results/v4_combined --inputs path/to/jev path/to/local`. The merge rejects different studies, mismatched data, and conflicting outputs. It needs no inference or API key."),
+    cells += [markdown("## Export this worker\n\nSave both worker ZIPs. GPU assignment, preflight, peak-memory records, and per-provider logs are included for local runs. Extract each ZIP into a separate directory, then merge with `python -m scripts.run_v4 merge --root results/v4_combined --inputs path/to/jev path/to/local`. The merge rejects different studies, mismatched data, and conflicting outputs. It needs no inference or API key."),
         code('''from IPython.display import FileLink, display
 if list(ROOT.rglob('summary.json')):
     command('export')
