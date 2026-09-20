@@ -45,7 +45,7 @@ def chart_rows(rows):
     return ''.join(result) + '<div class="axis" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>'
 
 def full_table(panel):
-    models = panel['models']
+    models = ['Jev zero-shot', 'Jev few-shot'] + [m for m in panel['models'] if not m.startswith('Jev ')]
     out = ['<caption class="sr-only">Raw balanced accuracy: mean ± sample standard deviation, three seeds.</caption><thead><tr><th scope="col">Dataset</th>']
     out.extend(f'<th scope="col">{html.escape(m)}</th>' for m in models)
     out.append('</tr></thead><tbody>')
@@ -55,7 +55,10 @@ def full_table(panel):
         for model in models:
             score = row['scores'][model]
             cls = ('jev-cell ' if model.startswith('Jev ') else '') + ('best' if score['mean'] == best else '')
-            out.append(f'<td class="{cls}">{score["mean"]:.1f} ± {score["sd"]:.1f}</td>')
+            value = f'{score["mean"]:.1f} ± {score["sd"]:.1f}'
+            if score['mean'] == best:
+                value = f'<strong>{value}</strong>'
+            out.append(f'<td class="{cls}">{value}</td>')
         out.append('</tr>')
     return ''.join(out) + '</tbody>'
 

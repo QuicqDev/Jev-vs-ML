@@ -20,10 +20,10 @@
     const wins = rows.filter(row => row.scores['Jev zero-shot'].mean > row.best);
     const lead = wins.length ? wins.reduce((a,b) => a.scores['Jev zero-shot'].mean-a.best > b.scores['Jev zero-shot'].mean-b.best ? a : b) : null;
     document.getElementById('result-takeaway').textContent = `${adjusted ? 'Adjusted zero-shot-prompt' : 'Raw zero-shot'} Jev leads the best classical mean on ${wins.length ? wins.map(r => r.dataset).join(' and ') : 'none of the selected datasets'}.${lead ? ` The largest lead is ${lead.dataset}: +${(lead.scores['Jev zero-shot'].mean-lead.best).toFixed(1)} percentage points.` : ''} These are descriptive differences, not statistical-significance claims.`;
-    const models = data[panel].models;
+    const models = ['Jev zero-shot', 'Jev few-shot', ...data[panel].models.filter(m => !m.startsWith('Jev '))];
     table.innerHTML = `<caption class="sr-only">${title} balanced accuracy: mean ± sample standard deviation, three seeds.</caption><thead><tr><th scope="col">Dataset</th>${models.map(m=>`<th scope="col">${escape(m)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => {
       const best = Math.max(...Object.values(row.scores).map(s => s.mean));
-      return `<tr><th scope="row">${escape(row.dataset)}</th>${models.map(m => { const s = row.scores[m]; return `<td class="${m.startsWith('Jev ') ? 'jev-cell ' : ''}${s.mean === best ? 'best' : ''}" title="${escape(m)}: ${escape(s.display)}">${s.mean.toFixed(1)} ± ${s.sd.toFixed(1)}</td>`; }).join('')}</tr>`;
+      return `<tr><th scope="row">${escape(row.dataset)}</th>${models.map(m => { const s = row.scores[m]; return `<td class="${m.startsWith('Jev ') ? 'jev-cell ' : ''}${s.mean === best ? 'best' : ''}" title="${escape(m)}: ${escape(s.display)}">${s.mean === best ? '<strong>' : ''}${s.mean.toFixed(1)} ± ${s.sd.toFixed(1)}${s.mean === best ? '</strong>' : ''}</td>`; }).join('')}</tr>`;
     }).join('')}</tbody>`;
     document.getElementById('table-panel').textContent = `${title} · ${rows.length} datasets · 14 model columns`;
     const download = document.getElementById('csv-download');
