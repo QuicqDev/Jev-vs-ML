@@ -1,5 +1,7 @@
 # Jev vs. classical machine learning
 
+**[Read the interactive benchmark report](https://quicqdev.github.io/Jev-vs-ML/)** · [Download the release graphic](docs/assets/benchmark-release.png)
+
 A completed comparison of **Jev 1.13.0 against 11 conventional classification pipelines** on eight datasets. The published run uses protocol **3.0.1 / V3**, three training seeds, and one fixed test set per dataset.
 
 **Finding:** Jev's strongest result is IMDb sentiment classification. It is competitive on AG News and SMS Spam, trails on Banking77, and does not outperform the strongest tested classical pipelines on the four tabular datasets. This is a bounded-budget comparison, not a comparison against best-possible ML or all modern language models.
@@ -79,6 +81,14 @@ The backend checks use doubles and the process checks do not perform CUDA comput
 To regenerate the CSVs from the saved outputs, run `python export_published_results.py`. To build a fresh unexecuted notebook from editable source, run `python build_modular_notebook.py --v3`. Generated notebooks and bundles go into the ignored `generated/` directory; the builder refuses to overwrite a notebook containing outputs.
 
 `.env`, virtual environments, raw local results, request caches under `results/`, and generated result archives are excluded from Git. Do not put credentials in notebook cells.
+
+## Report website
+
+The GitHub Pages report is served from `main` / `docs`. It includes raw and adjusted comparisons, text/tabular filters, the full score table, methodology, limitations, and downloadable results. No external JavaScript libraries, analytics, or API keys are required.
+
+Edit `docs/report.template.html` and `docs/assets/report.css` for the presentation. Run `python build_site.py` to regenerate `docs/index.html`, chart data, and downloadable CSVs from `published_results/`. The published HTML includes the raw table and chart even without JavaScript. Interactive controls are in `docs/assets/report.js`.
+
+The release graphic was made with the built-in image generation tool; the exact prompt and verification notes are in [image provenance](docs/image-generation.md). Its numbers were checked against the raw result panel. The website's bar charts are rendered directly from CSV values.
 
 ## Earlier experiments
 
