@@ -1,6 +1,7 @@
 """Build the dependency-free Pages report from the published score tables."""
 import csv
 import html
+import hashlib
 import json
 import re
 import shutil
@@ -67,6 +68,9 @@ def build():
     (DOCS / 'assets/data.js').write_text('window.BENCHMARK = ' + json.dumps(data, ensure_ascii=False, indent=2) + ';\n', encoding='utf-8')
     template = (DOCS / 'report.template.html').read_text(encoding='utf-8-sig')
     page = template.replace('__CHART__', chart_rows(data['raw']['rows'])).replace('__TABLE__', full_table(data['raw']))
+    for asset in ('assets/report.css', 'assets/report.js', 'assets/data.js'):
+        version = hashlib.sha256((DOCS / asset).read_bytes()).hexdigest()[:12]
+        page = page.replace(f'"{asset}"', f'"{asset}?v={version}"')
     assert '__CHART__' not in page and '__TABLE__' not in page
     (DOCS / 'index.html').write_text(page, encoding='utf-8')
     for panel in data:
