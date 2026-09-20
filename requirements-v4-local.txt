@@ -1,0 +1,4 @@
+# Install separately in the V4 local-model Kaggle session (Python 3.12+).
+# Exact source commits correspond to the adapter audits; no model weights install here.
+von-sdk @ git+https://github.com/wfzyx/von.git@bed7e7337791c5124a557eb59ad918cb6747b276
+laya @ git+https://github.com/NandhaKishorM/laya.git@42626c348753fbb17572a813127df2278a1ec527
