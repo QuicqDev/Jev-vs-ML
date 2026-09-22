@@ -9,12 +9,31 @@ from jevbench.datasets import make_holdout, make_split, prepare_data
 from .contracts import DecisionRequest, canonical, digest
 from .storage import freeze, read_json, source_fingerprint
 from .policy import DATASET as POLICY_DATASET, generate
+from .temporal import DATASET as TEMPORAL_DATASET, freeze_windows, prepare as prepare_temporal
 
 CONTINUITY_DATASETS = ("IMDb", "Banking77", "Bank Marketing")
-DATASETS = (POLICY_DATASET, *CONTINUITY_DATASETS)
+DATASETS = (POLICY_DATASET, TEMPORAL_DATASET, *CONTINUITY_DATASETS)
 
 
 def configuration(preset="pilot", suite="policy"):
+    if suite == "full":
+        if preset not in ("pilot", "study"):
+            raise ValueError("The full V4 suite uses pilot or study presets")
+        policy = (40, 16, 16, 32) if preset == "pilot" else (600, 160, 160, 600)
+        temporal = ((1200, 240, 120, 80) if preset == "pilot" else
+                    (8000, 1000, 500, 500))
+        return {"protocol": "4.0.0-rc1", "status": "additional-reddit-question-study",
+                "suite": suite, "preset": preset, "datasets": [POLICY_DATASET, TEMPORAL_DATASET],
+                "seeds": [2027], "jobs": {POLICY_DATASET: [2027],
+                TEMPORAL_DATASET: [0, 1, 2, -1]}, "generator_seed": 20260921,
+                "pairs_per_partition": dict(zip(("train", "validation", "policy", "test"), policy)),
+                "temporal_train_cap": temporal[0], "temporal_validation": temporal[1],
+                "temporal_policy": temporal[2], "temporal_test": temporal[3],
+                "temporal_windows": 3, "temporal_gap_hours": 24, "temporal_random_seed": -1,
+                "iterative_train_episodes": 160 if preset == "pilot" else 2000,
+                "iterative_policy_episodes": 40 if preset == "pilot" else 500,
+                "iterative_test_episodes": 50 if preset == "pilot" else 500,
+                "iterative_seed": 20260922, "iterative_max_steps": 4}
     if suite == "policy":
         if preset not in ("pilot", "study"):
             raise ValueError("The additional policy suite uses pilot or study presets")
@@ -24,7 +43,7 @@ def configuration(preset="pilot", suite="policy"):
                 "generator_seed": 20260921,
                 "pairs_per_partition": dict(zip(("train", "validation", "policy", "test"), counts))}
     if suite != "continuity":
-        raise ValueError("suite must be policy or continuity")
+        raise ValueError("suite must be full, policy or continuity")
     if preset not in ("pilot", "continuity"):
         raise ValueError("preset must be pilot or continuity")
     return {"protocol": "4.0.0-dev2", "status": "optional-continuity", "preset": preset,
@@ -56,8 +75,16 @@ def request_for(frame, row, metadata):
 
 def case_context(frame, row):
     """Evaluation metadata, never included in a provider's model input."""
-    return {key: str(frame.iloc[row]["_" + key])
-            for key in ("pair_id", "family", "composition", "pair_relation") if "_" + key in frame}
+    result = {key: str(frame.iloc[row]["_" + key])
+              for key in ("pair_id", "family", "composition", "pair_relation") if "_" + key in frame}
+    for key in ("timestamp", "target_timestamp"):
+        if key in frame:
+            result[key] = str(frame.iloc[row][key])
+    return result
+
+
+def job_ids(config, dataset):
+    return config.get("jobs", {}).get(dataset, config["seeds"])
 
 
 def freeze_splits(root, frame, metadata, config):
@@ -72,7 +99,7 @@ def freeze_splits(root, frame, metadata, config):
     if len(set(ids)) != len(ids):
         raise ValueError("Duplicate model inputs remain in the snapshot")
     split_hashes = {}
-    for seed in config["seeds"]:
+    for seed in job_ids(config, dataset):
         split = ({name: frame.index[frame["_partition"].eq(name)].tolist()
                   for name in config["pairs_per_partition"]} if is_policy
                  else make_split(frame, holdout, config, seed))
@@ -115,11 +142,19 @@ def prepare(root, config=None):
             freeze(folder / "metadata.json", metadata)
             frame.groupby(["_partition", "_family", "_composition"], sort=True).head(2).to_csv(
                 folder / "review_sample.csv", index=False)
+            freeze_splits(root, frame, metadata, config)
+        elif dataset == TEMPORAL_DATASET:
+            frame, metadata, windows = prepare_temporal(root, config)
+            freeze_windows(root, frame, metadata, windows)
         else:
             # Retain V3's loaders for explicitly requested continuity diagnostics.
             frame, metadata = prepare_data(dataset, root, config)
-        freeze_splits(root, frame, metadata, config)
+            freeze_splits(root, frame, metadata, config)
         print(f"Prepared {dataset}: {len(frame):,} complete, deduplicated inputs", flush=True)
+    if config.get("suite") == "full":
+        from .iterative import prepare as prepare_iterative
+        payload = prepare_iterative(root, config)
+        print(f"Prepared Iterative Support: {len(payload['partitions']['test']):,} test episodes", flush=True)
     return read_json(root / "run.json")
 
 
@@ -129,7 +164,7 @@ def load_job(root, dataset, seed):
         raise ValueError("V4 source changed; prepare a new run directory")
     if run["run_id"] != digest({"config": run["config"], "source": run["source_fingerprint"]}):
         raise ValueError("Run configuration changed")
-    if dataset not in run["config"]["datasets"] or seed not in run["config"]["seeds"]:
+    if dataset not in run["config"]["datasets"] or seed not in job_ids(run["config"], dataset):
         raise ValueError("Dataset/seed not in the frozen run")
     folder = dataset_folder(root, dataset)
     metadata = read_json(folder / "metadata.json")
