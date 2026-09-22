@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-from .data import load_job
+from .data import job_ids, load_job
 from .storage import freeze, read_json, write_json
 
 
@@ -111,7 +111,7 @@ def run_local(root, phase="pilot", indices=None, min_gpus=1, cpu_threads=2,
     if run["config"].get("suite", "continuity") != suite:
         raise ValueError("Run suite differs from requested suite")
     for name in ([dataset] if dataset else run["config"]["datasets"]):
-        for seed in run["config"]["seeds"]:
+        for seed in job_ids(run["config"], name):
             load_job(root, name, seed)
     assignments = assign_gpus(discover_gpus(), indices, min_gpus)
     directory = root / "execution" / "local"
@@ -190,3 +190,45 @@ def run_local(root, phase="pilot", indices=None, min_gpus=1, cpu_threads=2,
                 stream.close()
             owner.close()
             lock.unlink(missing_ok=True)
+
+
+def run_all_providers(root, phase="evaluate", indices=None, min_gpus=2, cpu_threads=2,
+                      suite="full", max_attempts=50000, max_seconds=7200):
+    """Run remote Jev beside the two isolated local GPU workers."""
+    if phase != "evaluate":
+        raise ValueError("The combined launcher is for complete evaluation only")
+    root = Path(root).resolve()
+    log_dir = root / "execution" / "combined"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    local = [sys.executable, "-m", "scripts.run_v4", "local", "--root", str(root),
+             "--suite", suite, "--phase", phase, "--min-gpus", str(min_gpus),
+             "--cpu-threads", str(cpu_threads), "--max-attempts", str(max_attempts),
+             "--max-seconds", str(max_seconds)]
+    if indices:
+        local += ["--gpus", *map(str, indices)]
+    jev = [sys.executable, "-m", "scripts.run_v4", "evaluate", "--root", str(root),
+           "--suite", suite, "--provider", "jev", "--max-attempts", str(max_attempts),
+           "--max-seconds", str(max_seconds)]
+    processes, streams = [], []
+    try:
+        for name, command in (("local", local), ("jev", jev)):
+            stream = (log_dir / f"{name}.log").open("a", encoding="utf-8")
+            streams.append(stream)
+            processes.append((name, subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1],
+                stdout=stream, stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)))
+        failures = []
+        for name, process in processes:
+            code = process.wait()
+            if code:
+                failures.append(f"{name}={code}")
+        if failures:
+            raise RuntimeError("Combined provider run failed: " + ", ".join(failures))
+    except KeyboardInterrupt:
+        for _, process in processes:
+            if process.poll() is None:
+                process.terminate()
+        raise
+    finally:
+        for stream in streams:
+            stream.close()

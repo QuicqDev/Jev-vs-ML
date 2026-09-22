@@ -1,4 +1,4 @@
-"""Build separate Jev and local-model notebooks over one frozen additional study."""
+"""Build the single self-contained V4 Kaggle notebook."""
 import argparse
 import base64
 import hashlib
@@ -8,146 +8,148 @@ import zipfile
 
 import nbformat
 
-from jevbench_v4.contracts import digest
-from jevbench_v4.data import configuration, prepare
-from jevbench_v4.storage import source_fingerprint
-
 ROOT = Path(__file__).resolve().parents[1]
-ROLES = ("jev", "local")
 
 
-def notebook_cells(role, blob, checksum):
+def _bundle():
+    names = []
+    for directory in ("jevbench", "jevbench_v4", "tests/v4"):
+        names.extend(path for path in (ROOT / directory).glob("*.py"))
+    for name in ("scripts/__init__.py", "scripts/run_v4.py", "scripts/build_v4_notebook.py",
+                 "tests/__init__.py", "tests/validate_v4.py", "requirements.txt",
+                 "requirements-dev.txt", "requirements-v4-local.txt", "requirements-v4-kaggle.txt",
+                 "docs/v4.md", "docs/protocols/BENCHMARK_V4_PLAN.md"):
+        names.append(ROOT / name)
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(names, key=lambda value: value.relative_to(ROOT).as_posix()):
+            info = zipfile.ZipInfo(path.relative_to(ROOT).as_posix(), date_time=(2026, 9, 22, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, path.read_bytes())
+    return output.getvalue()
+
+
+def notebook_cells(blob, checksum):
     markdown, code = nbformat.v4.new_markdown_cell, nbformat.v4.new_code_cell
-    cells = [markdown(f"""# V4 additional tests — {role} worker
+    encoded = base64.b64encode(blob).decode()
+    return [
+        markdown("""# Jev Benchmark V4 — Reddit questions
 
-Run this notebook alongside `jev_benchmark_v4_{'local' if role == 'jev' else 'jev'}.ipynb`.
-Both embed the **same frozen study**, including identical inputs, splits, source,
-and case IDs. They use independent output directories and can run simultaneously.
+This is one self-contained Kaggle notebook for the **new V4 experiments only**. It does not rerun V3.
 
-V3 is complete and remains unchanged. These notebooks do not rerun its datasets or
-classical benchmark. This first scaffold covers **new synthetic support-policy pairs**:
-negation, exceptions, event order, and paraphrases. Labels are a development draft
-pending human review. Temporal/AutoML and iterative-feedback tracks are planned,
-not implemented here; see `docs/protocols/BENCHMARK_V4_PLAN.md` after extraction.
+It compares Jev with Von and Laya on the same frozen cases, adds classical and frozen-embedding controls, tests AutoGluon on leakage-resistant future prediction, and measures whether feedback helps in an iterative simulator. During provider evaluation, Jev runs concurrently with Von on T4 0 and Laya on T4 1. The notebook refuses CPU fallback for either local model.
 
-Enable Internet. {'A CPU session is sufficient; enable the TYPESAFE_API_KEY Kaggle secret.' if role == 'jev' else 'Use a GPU session for Von/Laya; this notebook needs no Jev secret.'}
-All model switches start disabled. Inspect development compatibility and the review
-sample before interpreting test results. No output is a finished V4 publication."""),
-        code(f'''import base64, hashlib, io, sys, zipfile
+Before running, select Kaggle's **2× T4** accelerator, enable Internet, and add `TYPESAFE_API_KEY` as a Kaggle secret. `PRESET = "study"` is the full registered design; use `"pilot"` only for a pipeline check."""),
+        code(f'''# First executable cell: restore every source file and pinned requirement.
+import base64, hashlib, io, sys, zipfile
 from pathlib import Path
 
-WORKER_ROLE = {role!r}
 PACKAGE_SHA256 = {checksum!r}
-blob = base64.b64decode({base64.b64encode(blob).decode()!r})
-assert hashlib.sha256(blob).hexdigest() == PACKAGE_SHA256
+payload = base64.b64decode({encoded!r})
+assert hashlib.sha256(payload).hexdigest() == PACKAGE_SHA256
 CODE_DIR = Path('/kaggle/working') / ('jevbench_v4_code_' + PACKAGE_SHA256[:12])
 CODE_DIR.mkdir(parents=True, exist_ok=True)
-with zipfile.ZipFile(io.BytesIO(blob)) as archive:
+with zipfile.ZipFile(io.BytesIO(payload)) as archive:
     archive.extractall(CODE_DIR)
 sys.path.insert(0, str(CODE_DIR))
-print(CODE_DIR)
-'''), code('''import subprocess
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '-r', str(CODE_DIR / 'requirements-dev.txt')])
+print('Restored verified V4 source:', CODE_DIR)
+'''),
+        markdown("## Configuration"),
+        code('''PRESET = "study"       # "study" = registered full sizes; "pilot" = pipeline check
+RUN_PROVIDERS = True     # Jev + Von + Laya on the same frozen cases
+RUN_BASELINES = True     # majority/SVM/embedding + temporal controls + AutoGluon
+AUTOML_MINUTES = 30      # per temporal split, including the random-split diagnostic
+ROOT = Path('/kaggle/working') / ('jev_benchmark_v4_' + PRESET)
+print(ROOT)
+'''),
+        markdown("## Install the pinned environment and verify the packaged harness"),
+        code('''import subprocess
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '-r',
+                       str(CODE_DIR / 'requirements-v4-kaggle.txt')])
 subprocess.check_call([sys.executable, '-m', 'tests.validate_v4'], cwd=CODE_DIR)
-'''), markdown("## Load the common frozen study\n\nNo old dataset download or independent split generation. Both workers copy the same byte-for-byte study package and verify it before inference."),
-        code('''import shutil
-from jevbench_v4.storage import read_json
-from jevbench_v4.parallel import run_notebook_command
+'''),
+        markdown("""## Freeze the additional V4 study
 
-ROOT = Path('/kaggle/working') / ('jev_benchmark_v4_' + WORKER_ROLE)
-if not ROOT.exists():
-    shutil.copytree(CODE_DIR / 'study', ROOT)
-if read_json(ROOT / 'run.json') != read_json(CODE_DIR / 'study/run.json'):
-    raise ValueError('Different study already exists here; choose a fresh ROOT.')
+This downloads UCI Bike Sharing once, derives only past/present features, fixes the high-demand threshold from the first training block, creates three forward windows with a 24-hour embargo, and creates a separately labelled random-holdout diagnostic. It also freezes paired policy cases and deterministic iterative episodes."""),
+        code('''def command(action, *options):
+    subprocess.check_call([sys.executable, '-m', 'scripts.run_v4', action,
+                           '--root', str(ROOT), '--suite', 'full', *options], cwd=CODE_DIR)
 
-def command(action, *options):
-    run_notebook_command([sys.executable, '-m', 'scripts.run_v4', action,
-                          '--root', str(ROOT), *options], cwd=CODE_DIR)
-
+if not (ROOT / 'run.json').exists():
+    command('prepare', '--preset', PRESET)
 command('verify')
-print('Shared run ID:', read_json(ROOT / 'run.json')['run_id'])
-print('Review sample:', ROOT / 'data/Support_Policy/review_sample.csv')
-''')]
-    if role == "jev":
-        cells += [markdown("## Jev development compatibility\n\nRuns 50 training-partition cases from the new policy task. Request and time ceilings apply; a running call can finish after the time ceiling."),
-            code('''RUN_JEV = False
-if RUN_JEV:
-    command('pilot', '--provider', 'jev', '--max-attempts', '10000', '--max-seconds', '7200')
-'''), markdown("## Additional policy evaluation\n\nAfter development checks, this evaluates only the frozen new policy/test partitions. Synthetic labels still require review before publication."),
-            code('''RUN_EVALUATION = False
-if RUN_JEV and RUN_EVALUATION:
-    command('evaluate', '--provider', 'jev', '--max-attempts', '10000', '--max-seconds', '7200')
-''')]
-    else:
-        cells += [markdown("## Local development compatibility — two T4 GPUs\n\nSelect Kaggle's two-T4 accelerator. The launcher requires two visible GPUs, runs Von on the first and Laya on the second simultaneously, and limits each process to its assigned GPU. Each worker performs an FP16 CUDA smoke test and rejects SDK CPU fallback. The Jev notebook runs independently."),
-            code('''RUN_LOCAL_MODELS = False
-if RUN_LOCAL_MODELS:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '-r', str(CODE_DIR / 'requirements-v4-local.txt')])
-    command('local', '--phase', 'pilot', '--gpus', '0', '1', '--min-gpus', '2')
-'''), markdown("## Comparators on the new task only\n\nMajority and TF-IDF SVM use the new task's development labels. This does not repeat V3. Embeddings and temporal AutoML remain planned and must be added before claiming those Reddit questions are answered."),
-            code('''RUN_EVALUATION = False
-RUN_NEW_TASK_BASELINES = False
-if RUN_LOCAL_MODELS and RUN_EVALUATION:
-    command('local', '--phase', 'evaluate', '--gpus', '0', '1', '--min-gpus', '2')
-if RUN_NEW_TASK_BASELINES and RUN_EVALUATION:
-    command('baselines')
-''')]
-    cells += [markdown("## Export this worker\n\nSave both worker ZIPs. GPU assignment, preflight, peak-memory records, and per-provider logs are included for local runs. Extract each ZIP into a separate directory, then merge with `python -m scripts.run_v4 merge --root results/v4_combined --inputs path/to/jev path/to/local`. The merge rejects different studies, mismatched data, and conflicting outputs. It needs no inference or API key."),
+'''),
+        markdown("## Inspect the frozen design"),
+        code('''import json, pandas as pd
+run = json.loads((ROOT / 'run.json').read_text())
+display(pd.DataFrame([
+    {'track': 'Policy pairs', 'jobs': str(run['config']['jobs']['Support Policy']),
+     'test observations': 2 * run['config']['pairs_per_partition']['test']},
+    {'track': 'Future bike demand', 'jobs': '3 forward + 1 random diagnostic',
+     'test observations': run['config']['temporal_test']},
+    {'track': 'Iterative support', 'jobs': '4 controlled conditions',
+     'test observations': run['config']['iterative_test_episodes']},
+]))
+display(pd.read_csv(ROOT / 'data/Support_Policy/review_sample.csv').head(12))
+'''),
+        markdown("""## Jev, Von, and Laya — concurrent provider run
+
+The parent process starts Jev alongside two isolated CUDA workers. Von sees only physical GPU 0; Laya sees only physical GPU 1. Each local worker performs an FP16 CUDA test and verifies model tensors remain on its assigned card. All three evaluate the same frozen policy, temporal, and iterative inputs."""),
+        code('''if RUN_PROVIDERS:
+    command('all-providers', '--phase', 'evaluate', '--gpus', '0', '1', '--min-gpus', '2',
+            '--max-attempts', '100000', '--max-seconds', '43200')
+else:
+    print('Provider evaluation disabled in Configuration.')
+'''),
+        markdown("""## New-task controls and AutoML
+
+These are additions to V4. They do not rerun the V3 ML benchmark. The forward tasks use persistence, same-hour-last-week, RBF SVM, CatBoost, and AutoGluon. AutoGluon receives explicit past-to-future tuning data; random bagging, stacking, dynamic stacking, and threshold calibration are disabled. The policy task adds majority, TF-IDF SVM, and a frozen sentence-embedding logistic model."""),
+        code('''if RUN_BASELINES:
+    command('baselines', '--cpu-threads', '4', '--automl-minutes', str(AUTOML_MINUTES))
+else:
+    print('Baseline evaluation disabled in Configuration.')
+'''),
+        markdown("## Rebuild summaries and download the auditable result bundle"),
         code('''from IPython.display import FileLink, display
 if list(ROOT.rglob('summary.json')):
     command('export')
+    display(pd.read_csv(ROOT / 'summary.csv'))
+    display(pd.read_csv(ROOT / 'comparisons_vs_jev.csv'))
+    display(pd.read_csv(ROOT / 'iterative_comparisons_vs_jev.csv'))
     display(FileLink(str(ROOT.with_name(ROOT.name + '_results.zip'))))
 else:
-    print('No model jobs completed yet; enable a worker cell above.')
+    print('No completed evaluations are available yet.')
 ''')]
-    return cells
 
 
-def build(output_dir, preset="pilot"):
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    destinations = {role: output_dir / f"jev_benchmark_v4_{role}.ipynb" for role in ROLES}
-    for destination in destinations.values():
-        if destination.exists():
-            previous = nbformat.read(destination, as_version=4)
-            if any(cell.get("outputs") for cell in previous.cells):
-                raise ValueError("Refusing to overwrite an executed notebook")
-    config = configuration(preset, suite="policy")
-    study = output_dir / ("v4_inputs_" + digest({"config": config, "source": source_fingerprint()})[:16])
-    prepare(study, config)
-    source = io.BytesIO()
-    with zipfile.ZipFile(source, "w", zipfile.ZIP_DEFLATED) as archive:
-        for directory in ("jevbench", "jevbench_v4", "tests/v4"):
-            for path in sorted((ROOT / directory).glob("*.py")):
-                archive.write(path, path.relative_to(ROOT))
-        for name in ("scripts/__init__.py", "scripts/run_v4.py", "scripts/build_v4_notebook.py",
-                     "tests/__init__.py", "tests/validate_v4.py", "requirements.txt", "requirements-dev.txt",
-                     "requirements-v4-local.txt", "docs/v4.md", "docs/protocols/BENCHMARK_V4_PLAN.md"):
-            archive.write(ROOT / name, name)
-        for path in sorted(study.rglob("*")):
-            if path.is_file():
-                archive.write(path, "study/" + path.relative_to(study).as_posix())
-    blob = source.getvalue()
+def build(output=ROOT / "notebooks" / "jev_benchmark_v4.ipynb"):
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        previous = nbformat.read(output, as_version=4)
+        if any(cell.get("outputs") for cell in previous.cells):
+            raise ValueError("Refusing to overwrite an executed notebook")
+    blob = _bundle()
     checksum = hashlib.sha256(blob).hexdigest()
-    for role, destination in destinations.items():
-        cells = notebook_cells(role, blob, checksum)
-        notebook = nbformat.v4.new_notebook(cells=cells, metadata={
-            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-            "language_info": {"name": "python"},
-            "kaggle": {"accelerator": "none" if role == "jev" else "gpu", "isInternetEnabled": True}})
-        nbformat.validate(notebook)
-        for cell in cells:
-            if cell.cell_type == "code":
-                compile(cell.source, "v4-notebook-cell", "exec")
-        nbformat.write(notebook, destination)
-        print(destination)
-    (output_dir / "jev_benchmark_v4_source.zip").write_bytes(blob)
-    return destinations
+    cells = notebook_cells(blob, checksum)
+    for index, cell in enumerate(cells):
+        cell["id"] = f"v4-{index:02d}"
+    notebook = nbformat.v4.new_notebook(cells=cells, metadata={
+        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+        "language_info": {"name": "python"},
+        "kaggle": {"accelerator": "gpu", "isInternetEnabled": True, "gpuType": "T4 x2"}})
+    nbformat.validate(notebook)
+    for cell in cells:
+        if cell.cell_type == "code":
+            compile(cell.source, "jev-benchmark-v4-cell", "exec")
+    nbformat.write(notebook, output)
+    print(output)
+    return output
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=ROOT / "generated")
-    parser.add_argument("--preset", choices=("pilot", "study"), default="pilot")
+    parser.add_argument("--output", type=Path, default=ROOT / "notebooks" / "jev_benchmark_v4.ipynb")
     args = parser.parse_args()
-    build(args.output_dir, args.preset)
+    build(args.output)
