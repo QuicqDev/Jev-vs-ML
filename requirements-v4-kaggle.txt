@@ -1,0 +1,5 @@
+# Complete V4 Kaggle environment. The notebook installs this after unpacking its source bundle.
+-r requirements-dev.txt
+-r requirements-v4-local.txt
+sentence-transformers==6.1.0
+autogluon.tabular==1.6.3
