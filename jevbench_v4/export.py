@@ -16,6 +16,9 @@ def collect_summaries(root):
     summaries = []
     for path in sorted(root.rglob("summary.json")):
         saved = read_json(path)
+        # Iterative episodes have a whole-episode schema and are exported verbatim.
+        if saved.get("dataset") not in run["config"]["datasets"]:
+            continue
         frame, metadata, split = load_job(root, saved["dataset"], saved["seed"])
         records = [json.loads(line) for line in path.with_name("predictions.jsonl").read_text(encoding="utf-8").splitlines()]
         job = read_json(path.with_name("job.json"))
@@ -54,6 +57,9 @@ def collect_summaries(root):
 def export_run(root):
     root = Path(root).resolve()
     summaries = collect_summaries(root)
+    from .analysis import build_comparisons, build_iterative_comparisons
+    build_comparisons(root, summaries)
+    build_iterative_comparisons(root)
     write_json(root / "summaries.json", summaries)
     columns = ("dataset", "suite", "status", "label_status", "seed", "partition", "model", "panel", "n", "accuracy", "balanced_accuracy",
                "n_pairs", "both_members_correct",
@@ -76,7 +82,7 @@ def export_run(root):
         for directory in ("jevbench", "jevbench_v4"):
             for path in sorted((source_root / directory).glob("*.py")):
                 archive.write(path, "source/" + path.relative_to(source_root).as_posix())
-        for name in ("requirements.txt", "requirements-v4-local.txt"):
+        for name in ("requirements.txt", "requirements-v4-local.txt", "requirements-v4-kaggle.txt"):
             archive.write(source_root / name, "source/" + name)
         for name in ("scripts/__init__.py", "scripts/run_v4.py"):
             archive.write(source_root / name, "source/" + name)
