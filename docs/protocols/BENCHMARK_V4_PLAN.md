@@ -1,6 +1,6 @@
 # V4 additions: alternatives, generalization, and iterative decisions
 
-Status: proposed study, not a frozen protocol or an executed benchmark. Updated 2026-09-21 against the Reddit comments supplied by the user. V4 adds new experiments; **do not rerun V3 datasets, Jev results, or the eleven-family ML benchmark**. The published V3 release remains historical context. Run **two independent notebooks in parallel**, one for Jev and one for local models, over the same frozen new cases. Jev tokens are currently unlimited; runtime, GPU memory, API throughput, and quality of evidence remain practical limits.
+Status: implemented study harness, not an executed benchmark. Updated 2026-09-22 against the Reddit comments supplied by the user. V4 adds new experiments; **do not rerun V3 datasets, Jev results, or the eleven-family ML benchmark**. The published V3 release remains historical context. Run the single self-contained Kaggle notebook over one frozen study. Jev is a concurrent network worker while Von and Laya occupy the two T4 GPUs.
 
 ## Reddit feedback to experiment mapping
 
@@ -14,7 +14,7 @@ The user supplied these comments directly; no Reddit thread URL was provided. Th
 | Random time-series holdouts say little about the future | Train in the past and test on three later, nonoverlapping windows | Future balanced accuracy versus persistence, seasonal, SVM, CatBoost, and AutoML baselines; random-split diagnostic kept separate |
 | Would RL training help iterative problems? | New support simulator with bounded inspections and terminal actions | Success and utility across one-shot, feedback, repeated-no-evidence, and fixed-evidence conditions |
 
-The first implementation now has provider adapters, a **draft** policy-pair generator, pair metrics, and two notebook workers. AutoML, embeddings, temporal splits, simulator conditions, and paired uncertainty are still to be implemented. A checked box for infrastructure is not an answered research question.
+The harness now includes provider adapters, a **draft** policy-pair generator, frozen embeddings, forward temporal splits, AutoGluon, simulator conditions, and paired comparative intervals. Actual model results remain to be produced on Kaggle. Infrastructure alone is not an answered research question.
 
 ## Questions and interpretation
 
@@ -125,11 +125,10 @@ Primary outputs: episode success, mean net utility, critical-error rate, escalat
 
 ## Kaggle execution and deliverables
 
-1. **Shared preparation:** generate/download only new task data once; validate splits, timestamps, pairs, and simulator transitions. Freeze a common study artifact containing exact inputs, case IDs, episodes, protocol, source, and hashes. Build both notebooks from that artifact. They must not independently resample cases.
-2. **Notebook A — Jev:** CPU session with Internet and the API secret. Run compatibility and new-task Jev inference with bounded retries and service-safe pacing. It does no classical training and installs no Von/Laya SDKs.
-3. **Notebook B — local models:** two-T4 GPU session. Run Von on GPU 0 and Laya on GPU 1 concurrently in processes that each see only their assigned card. Require two GPUs in the notebook, exercise FP16 CUDA allocation/math before loading, and reject SDK CPU fallback. Save assignment, actual device, per-worker logs, and peak-memory records. The two T4s are not pooled memory; each model must fit independently. Frozen embeddings and CPU-limited SVM/CatBoost/AutoML jobs follow as their implementations become available. If AutoML requires incompatible packages, use an isolated environment within this notebook before starting work.
-4. **Parallel evaluation:** both notebooks may run at the same time and have separate checkpoints, caches, logs, and archives. Each performs all conditions assigned to its models, including loop controls when implemented. A development pilot uses only development cases; final package/model revisions and test-family generation must be fixed before the study run.
-5. **Combine after completion:** download both archives and merge extracted directories. Require matching study ID, source and dataset hashes, case order, and control definitions. Reject conflicting results instead of overwriting them. Recompute metrics from predictions/trajectories. A local merge command is sufficient; no third model-running notebook is needed.
+1. **Shared preparation:** the notebook generates/downloads only new task data, validates timestamps, pairs, and simulator transitions, and freezes exact inputs, case IDs, episodes, source, and hashes.
+2. **Concurrent providers:** Jev runs as a network worker while Von runs on GPU 0 and Laya runs on GPU 1. Each local process sees only its assigned card, exercises FP16 CUDA math, and rejects CPU fallback.
+3. **New-task baselines:** after provider inference, run the frozen embedding, CPU-limited SVM/CatBoost controls, and AutoGluon on the frozen development partitions. No V3 task is scheduled.
+4. **Reconstruction:** recompute summaries from raw predictions and trajectories, then create paired Jev-versus-comparator tables and an auditable archive.
 
 Unlimited tokens allows larger paired evaluations and real repeatability measurements where useful. Keep request/elapsed-time ceilings to stop runaway loops; make any monetary estimate guard configurable for this account rather than letting V3's old $20 proxy budget determine the study. No API calls are part of this planning step.
 
@@ -138,14 +137,14 @@ Implementation map for a subsequent build:
 | Existing area | Proposed change |
 |---|---|
 | `jevbench_v4/providers.py`, `client.py` | Pinned decision adapters, complete-input audits, provider-aware cache/provenance; implemented |
-| `jevbench_v4/policy.py`, `data.py` | Draft policy pairs and group splits implemented; temporal timestamps/windows still needed |
-| `jevbench_v4/baselines.py` | New-task SVM/majority implemented; embeddings and AutoML still needed |
-| New `jevbench_v4` simulator module | Seeded episodes, legal actions, transitions, costs, control conditions; planned |
-| `jevbench_v4/metrics.py`, `export.py`, `workers.py` | Raw/pair metrics and verified worker merge implemented; coverage, utility, cluster/block intervals planned |
-| `scripts/build_v4_notebook.py` | Exactly two worker notebooks sharing immutable new-task inputs; implemented for the policy draft |
-| `jevbench_v4/parallel.py` | Separate-GPU Von/Laya scheduling, child CUDA preflight, cancellation and process isolation; implemented, real dual-T4 model pilot still pending |
+| `jevbench_v4/policy.py`, `data.py`, `temporal.py` | Policy pairs, exact timestamp features, three forward windows, embargo, and random diagnostic implemented |
+| `jevbench_v4/baselines.py` | New-task SVM/majority, frozen embeddings, temporal controls, CatBoost, and AutoGluon implemented |
+| `jevbench_v4/iterative.py` | Seeded episodes, inspections, costs, four conditions, executable control and oracle implemented |
+| `jevbench_v4/metrics.py`, `analysis.py`, `export.py` | Raw/pair metrics and paired pair/block/episode comparison tables implemented |
+| `scripts/build_v4_notebook.py` | One checksum-verified self-contained Kaggle notebook implemented |
+| `jevbench_v4/parallel.py` | Concurrent Jev plus separate-GPU Von/Laya scheduling implemented; real dual-T4 execution remains for Kaggle |
 
-Build order: (1) finish and review policy cases, add the embedding comparator, and validate Von/Laya compatibility; (2) implement temporal windows and AutoML; (3) implement the support simulator and four controls; (4) add paired uncertainty, freeze the complete study, and execute both notebooks. A full V4 report needs all three tracks. Preserve the published V3 artifacts and report task-specific accuracy, robustness, automation risk, and runtime.
+Remaining before publication: independently review the synthetic policy cases, execute a development pilot on Kaggle, freeze the resulting complete environment, and then run the study without changing test cases or model settings. Preserve the published V3 artifacts and report task-specific accuracy, robustness, automation risk, and runtime.
 
 ## Retained continuity tooling
 
