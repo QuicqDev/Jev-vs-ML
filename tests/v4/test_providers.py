@@ -41,6 +41,13 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(list(sent["questions"]["classification"]["criteria"]), [f"C{i}" for i in range(77)])
         self.assertNotIn("FAKE-KEY", json.dumps(provider.identity))
 
+    def test_jev_credential_preflight_makes_no_request(self):
+        session = Mock()
+        with patch.dict("os.environ", {"TYPESAFE_API_KEY": " configured "}):
+            provider = JevProvider(session=session)
+            self.assertEqual(provider.load_key(), "configured")
+        session.post.assert_not_called()
+
     def test_http_errors_are_sanitized_and_model_aliases_rejected(self):
         with self.assertRaises(ValueError):
             JevProvider("jev-latest")

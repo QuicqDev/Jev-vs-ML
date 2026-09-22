@@ -197,6 +197,9 @@ def run_all_providers(root, phase="evaluate", indices=None, min_gpus=2, cpu_thre
     """Run remote Jev beside the two isolated local GPU workers."""
     if phase != "evaluate":
         raise ValueError("The combined launcher is for complete evaluation only")
+    # Fail before allocating either GPU when the remote worker cannot authenticate.
+    from .providers import JevProvider
+    JevProvider().load_key()
     root = Path(root).resolve()
     log_dir = root / "execution" / "combined"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -210,9 +213,10 @@ def run_all_providers(root, phase="evaluate", indices=None, min_gpus=2, cpu_thre
            "--suite", suite, "--provider", "jev", "--max-attempts", str(max_attempts),
            "--max-seconds", str(max_seconds)]
     processes, streams = [], []
+    logs = {name: log_dir / f"{name}.log" for name in ("local", "jev")}
     try:
         for name, command in (("local", local), ("jev", jev)):
-            stream = (log_dir / f"{name}.log").open("a", encoding="utf-8")
+            stream = logs[name].open("a", encoding="utf-8")
             streams.append(stream)
             processes.append((name, subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1],
                 stdout=stream, stderr=subprocess.STDOUT,
@@ -223,7 +227,13 @@ def run_all_providers(root, phase="evaluate", indices=None, min_gpus=2, cpu_thre
             if code:
                 failures.append(f"{name}={code}")
         if failures:
-            raise RuntimeError("Combined provider run failed: " + ", ".join(failures))
+            details = []
+            for name, path in logs.items():
+                if path.exists():
+                    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                    details.append(f"--- {name}.log (last 60 lines) ---\n" + "\n".join(lines[-60:]))
+            raise RuntimeError("Combined provider run failed: " + ", ".join(failures)
+                               + "\n" + "\n".join(details))
     except KeyboardInterrupt:
         for _, process in processes:
             if process.poll() is None:

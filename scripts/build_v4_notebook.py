@@ -96,9 +96,21 @@ display(pd.read_csv(ROOT / 'data/Support_Policy/review_sample.csv').head(12))
         markdown("""## Jev, Von, and Laya — concurrent provider run
 
 The parent process starts Jev alongside two isolated CUDA workers. Von sees only physical GPU 0; Laya sees only physical GPU 1. Each local worker performs an FP16 CUDA test and verifies model tensors remain on its assigned card. All three evaluate the same frozen policy, temporal, and iterative inputs."""),
+        code('''# Credential preflight only: no API request is made here.
+from jevbench_v4.providers import JevProvider
+print('Jev credential:', JevProvider().load_key())
+'''),
         code('''if RUN_PROVIDERS:
-    command('all-providers', '--phase', 'evaluate', '--gpus', '0', '1', '--min-gpus', '2',
-            '--max-attempts', '100000', '--max-seconds', '43200')
+    try:
+        command('all-providers', '--phase', 'evaluate', '--gpus', '0', '1', '--min-gpus', '2',
+                '--max-attempts', '100000', '--max-seconds', '43200')
+    except subprocess.CalledProcessError:
+        for name in ('jev', 'local'):
+            log = ROOT / 'execution/combined' / (name + '.log')
+            if log.exists():
+                print(f'\\n--- {name}.log (last 80 lines) ---')
+                print('\\n'.join(log.read_text(errors='replace').splitlines()[-80:]))
+        raise
 else:
     print('Provider evaluation disabled in Configuration.')
 '''),

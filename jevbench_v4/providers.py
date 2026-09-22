@@ -45,12 +45,8 @@ class JevProvider:
         self._key = key
         self.identity = {"name": "jev", "model": model, "endpoint": "https://api.typesafe.ai/v1/systemone"}
 
-    def audit(self, request):
-        # Server-side tokenizer details are unavailable; do not invent token counts.
-        return {"representation": "full-json-request", "choice_count": len(request.choices),
-                "client_truncated": False, "server_tokenization": "unverified"}
-
-    def predict(self, request, audit):
+    def load_key(self):
+        """Resolve the credential without making a request or exposing its value."""
         if not self._key:
             self._key = os.environ.get("TYPESAFE_API_KEY", "").strip()
             if not self._key:
@@ -58,9 +54,19 @@ class JevProvider:
                     from kaggle_secrets import UserSecretsClient
                     self._key = UserSecretsClient().get_secret("TYPESAFE_API_KEY").strip()
                 except Exception:
-                    raise PermanentProviderError("Set TYPESAFE_API_KEY or enable the Kaggle secret") from None
+                    raise PermanentProviderError(
+                        "Set TYPESAFE_API_KEY and enable this Kaggle notebook's access to the secret") from None
         if not self._key:
             raise PermanentProviderError("TYPESAFE_API_KEY is empty")
+        return "configured"
+
+    def audit(self, request):
+        # Server-side tokenizer details are unavailable; do not invent token counts.
+        return {"representation": "full-json-request", "choice_count": len(request.choices),
+                "client_truncated": False, "server_tokenization": "unverified"}
+
+    def predict(self, request, audit):
+        self.load_key()
         try:
             response = self.session.post(self.identity["endpoint"],
                 headers={"Authorization": "Bearer " + self._key},
